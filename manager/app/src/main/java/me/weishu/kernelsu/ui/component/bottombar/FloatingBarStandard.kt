@@ -44,7 +44,8 @@ internal fun FloatingBarStandard(
     selectedIndex: Int,
     badge: (BottomBarDestination) -> NavBadge?,
     onSelect: (BottomBarDestination) -> Unit,
-    liquidIndicator: LiquidIndicatorGlass? = null,
+    selectionColor: Color? = null,
+    selectionContentColor: Color? = null,
     modifier: Modifier = Modifier,
 ) {
     if (destinations.isEmpty()) return
@@ -102,24 +103,9 @@ internal fun FloatingBarStandard(
                         .fillMaxHeight()
                         .padding(horizontal = indicatorPadding)
                         .width(itemSize)
-                        .then(
-                            if (liquidIndicator != null) {
-                                Modifier
-                                    .liquidIndicatorGlass(
-                                        glass = liquidIndicator,
-                                        shape = itemShape,
-                                        lensPx = with(density) { 10.dp.toPx() },
-                                    )
-                                    .background(
-                                        color = liquidIndicator.film,
-                                        shape = itemShape,
-                                    )
-                            } else {
-                                Modifier.background(
-                                    color = MaterialTheme.colorScheme.secondaryContainer,
-                                    shape = itemShape,
-                                )
-                            }
+                        .background(
+                            color = selectionColor ?: MaterialTheme.colorScheme.secondaryContainer,
+                            shape = itemShape,
                         ),
                 )
             }
@@ -132,17 +118,9 @@ internal fun FloatingBarStandard(
                     val selected = index == selectedIndex
                     val navBadge = badge(destination)
                     val tint = if (selected) {
-                        if (liquidIndicator != null) {
-                            MaterialTheme.colorScheme.onSurface
-                        } else {
-                            MaterialTheme.colorScheme.onSecondaryContainer
-                        }
+                        selectionContentColor ?: MaterialTheme.colorScheme.onSecondaryContainer
                     } else {
-                        if (liquidIndicator != null) {
-                            MaterialTheme.colorScheme.onSurface
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        }
+                        MaterialTheme.colorScheme.onSurfaceVariant
                     }
                     Box(
                         modifier = Modifier

@@ -9,10 +9,19 @@ import android.os.SystemClock
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleOut
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
@@ -44,14 +53,17 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.compose.LifecycleResumeEffect
@@ -59,9 +71,17 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
+import androidx.navigation3.runtime.rememberDecoratedNavEntries
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
+import androidx.navigation3.scene.Scene
+import androidx.navigation3.scene.SceneInfo
+import androidx.navigation3.scene.SinglePaneSceneStrategy
+import androidx.navigation3.scene.rememberSceneState
+import androidx.navigation3.ui.LocalNavAnimatedContentScope
 import androidx.navigation3.ui.NavDisplay
+import androidx.navigation3.ui.defaultTransitionSpec
 import androidx.navigationevent.NavigationEventInfo
+import androidx.navigationevent.NavigationEventTransitionState.InProgress
 import androidx.navigationevent.compose.NavigationBackHandler
 import androidx.navigationevent.compose.rememberNavigationEventState
 import kotlinx.coroutines.Dispatchers
@@ -97,22 +117,23 @@ import me.weishu.kernelsu.ui.component.bottombar.rememberFloatingBarVisibilitySt
 import me.weishu.kernelsu.ui.component.bottombar.rememberMainPagerState
 import me.weishu.kernelsu.ui.component.bottombar.rememberNavBarGlassLiquidState
 import me.weishu.kernelsu.ui.component.bottombar.useNavigationRail
-import top.yukonga.miuix.kmp.blur.layerBackdrop
-import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import me.weishu.kernelsu.ui.navigation3.EXTRA_INCOMING_URIS
 import me.weishu.kernelsu.ui.navigation3.IntentDispatcher
+import me.weishu.kernelsu.ui.navigation3.LocalNavOriginState
 import me.weishu.kernelsu.ui.navigation3.LocalNavigator
+import me.weishu.kernelsu.ui.navigation3.NavOriginState
 import me.weishu.kernelsu.ui.navigation3.Navigator
-import me.weishu.kernelsu.ui.navigation3.PredictiveBackConfig
 import me.weishu.kernelsu.ui.navigation3.Route
-import me.weishu.kernelsu.ui.navigation3.rememberPredictiveBackEntryDecorator
-import me.weishu.kernelsu.ui.navigation3.rememberPredictiveBackTransitions
+import me.weishu.kernelsu.ui.navigation3.rememberNavContainerTransformDecorator
+import me.weishu.kernelsu.ui.navigation3.rememberNavOriginState
 import me.weishu.kernelsu.ui.navigation3.rememberNavigator
+import me.weishu.kernelsu.ui.navigation3.trackNavPointer
 import me.weishu.kernelsu.ui.screen.about.AboutScreen
 import me.weishu.kernelsu.ui.screen.appprofile.AppProfileScreen
 import me.weishu.kernelsu.ui.screen.colorpalette.ColorPaletteScreen
 import me.weishu.kernelsu.ui.screen.executemoduleaction.ExecuteModuleActionScreen
 import me.weishu.kernelsu.ui.screen.flash.FlashScreen
+import me.weishu.kernelsu.ui.screen.home.HomeMetamodule
 import me.weishu.kernelsu.ui.screen.home.HomePager
 import me.weishu.kernelsu.ui.screen.home.LocalHomeLayoutStyle
 import me.weishu.kernelsu.ui.screen.home.LocalSupportLinksCustom
@@ -216,6 +237,8 @@ open class MainActivity : FragmentActivity() {
         me.weishu.kernelsu.media.MusicConfig.load(this)
         me.weishu.kernelsu.media.SoundEffectConfig.load(this)
         me.weishu.kernelsu.media.VibrationConfig.load(this)
+        me.weishu.kernelsu.ui.component.material.SwitchIconConfig.load(this)
+        me.weishu.kernelsu.ui.component.material.SliderTrackConfig.load(this)
         me.weishu.kernelsu.media.VisualMediaConfig.load(this)
         me.weishu.kernelsu.media.MusicManager.init(this)
         if (savedInstanceState == null) me.weishu.kernelsu.media.SoundEffectManager.playStartup(this)
@@ -249,6 +272,7 @@ open class MainActivity : FragmentActivity() {
             }
 
             val navigator = rememberNavigator(Route.Main)
+            val navOriginState = rememberNavOriginState()
             val systemDensity = LocalDensity.current
             val density = remember(systemDensity, uiState.pageScale) {
                 Density(systemDensity.density * uiState.pageScale, systemDensity.fontScale)
@@ -270,6 +294,7 @@ open class MainActivity : FragmentActivity() {
 
             CompositionLocalProvider(
                 LocalNavigator provides navigator,
+                LocalNavOriginState provides navOriginState,
                 LocalDensity provides density,
                 LocalColorMode provides appSettings.colorMode.value,
                 LocalEnableNavigationBadge provides uiState.enableNavigationBadge,
@@ -291,8 +316,6 @@ open class MainActivity : FragmentActivity() {
                     if (LocalAppUnlocked.current) IntentDispatcher(intentChannel = intentChannel)
                     val flashRoute = navigator.current() as? Route.Flash
                     var flashBackEnabled by remember(flashRoute) { mutableStateOf(false) }
-                    // Shared by the display and by the predictive back interceptor, so a gesture
-                    // that is handled outside the display behaves exactly like a system back.
                     val navigateBack: () -> Unit = {
                         when (val top = navigator.current()) {
                             is Route.Flash -> if (flashBackEnabled) navigator.pop()
@@ -307,31 +330,30 @@ open class MainActivity : FragmentActivity() {
                             else -> navigator.pop()
                         }
                     }
-                    val predictiveBackRevision by PredictiveBackConfig.revision.collectAsStateWithLifecycle()
-                    val predictiveBackAnimation = remember(predictiveBackRevision) {
-                        PredictiveBackConfig.animation
-                    }
-                    val predictiveBackExitDirection = remember(predictiveBackRevision) {
-                        PredictiveBackConfig.exitDirection
-                    }
-                    val predictiveBackTransitions = rememberPredictiveBackTransitions<NavKey>(
-                        animation = predictiveBackAnimation,
-                        exitDirection = predictiveBackExitDirection,
-                    )
-                    val predictiveBackEntryDecorator = rememberPredictiveBackEntryDecorator<NavKey>(
-                        interceptPredictiveBack = predictiveBackTransitions.interceptsPredictiveBack,
-                        isBackEnabled = { navigator.backStackSize() > 1 },
-                        onBack = navigateBack,
-                    )
-                    // The interceptor is only added for the style that previews nothing, so every
-                    // other style keeps the plain entry decoration it had before.
                     val saveableStateHolderDecorator =
                         rememberSaveableStateHolderNavEntryDecorator<NavKey>()
-                    val entryDecorators = if (predictiveBackTransitions.interceptsPredictiveBack) {
-                        listOf(saveableStateHolderDecorator, predictiveBackEntryDecorator)
-                    } else {
-                        listOf(saveableStateHolderDecorator)
+                    val containerTransformDecorator =
+                        rememberNavContainerTransformDecorator(navOriginState)
+                    val entryDecorators = listOf(
+                        saveableStateHolderDecorator,
+                        containerTransformDecorator,
+                    )
+                    val layoutDirection = LocalLayoutDirection.current
+                    val wallpaperActive = LocalFolkWallpaperTokens.current != null
+                    val transition = remember(layoutDirection, navOriginState, wallpaperActive) {
+                        navTransition(layoutDirection, navOriginState, wallpaperActive)
                     }
+                    val popTransition = remember(layoutDirection, navOriginState, wallpaperActive) {
+                        navPopTransition(layoutDirection, navOriginState, wallpaperActive)
+                    }
+                    val predictivePopTransition =
+                        remember(layoutDirection, navOriginState, wallpaperActive) {
+                            navPredictivePopTransition(
+                                layoutDirection,
+                                navOriginState,
+                                wallpaperActive,
+                            )
+                        }
                     val mainScreenEntry = @Composable {
                         MainScreen(
                             initialPage = selectedMainPage,
@@ -340,18 +362,17 @@ open class MainActivity : FragmentActivity() {
                     }
 
                     val navDisplay = @Composable {
-                        NavDisplay(
+                        val decoratedEntries = rememberDecoratedNavEntries(
                             backStack = navigator.backStack,
-                            onBack = navigateBack,
-                            transitionSpec = predictiveBackTransitions.transitionSpec,
-                            popTransitionSpec = predictiveBackTransitions.popTransitionSpec,
-                            predictivePopTransitionSpec = predictiveBackTransitions.predictivePopTransitionSpec,
                             entryDecorators = entryDecorators,
                             entryProvider = entryProvider<NavKey> {
                                 entry<Route.Main> { mainScreenEntry() }
                                 entry<Route.About> { AboutScreen() }
                                 entry<Route.Sulog> { SulogScreen() }
                                 entry<Route.Susfs> { me.weishu.kernelsu.ui.screen.SusfsScreen() }
+                                entry<Route.UtsView> {
+                                    me.weishu.kernelsu.ui.screen.uts.UtsViewScreen()
+                                }
                                 entry<Route.Nomount> {
                                     me.weishu.kernelsu.ui.screen.nomount.NomountScreen()
                                 }
@@ -367,6 +388,9 @@ open class MainActivity : FragmentActivity() {
                                 entry<Route.AppProfile> { key -> AppProfileScreen(key.uid) }
                                 entry<Route.ModuleRepo> { ModuleRepoScreen() }
                                 entry<Route.ModuleRepoDetail> { key -> ModuleRepoDetailScreen(key.module) }
+                                entry<Route.KernelModules> {
+                                    me.weishu.kernelsu.ui.screen.kernelmodule.KernelModuleScreen()
+                                }
                                 entry<Route.PluginStore> { PluginStoreScreen() }
                                 entry<Route.Install> { InstallScreen() }
                                 entry<Route.Flash> { key ->
@@ -383,10 +407,6 @@ open class MainActivity : FragmentActivity() {
                                         key.fromShortcut
                                     )
                                 }
-                                entry<Route.Home> { mainScreenEntry() }
-                                entry<Route.SuperUser> { mainScreenEntry() }
-                                entry<Route.Module> { mainScreenEntry() }
-                                entry<Route.Settings> { mainScreenEntry() }
                                 entry<Route.Wallpaper> { WallpaperScreen() }
                                 entry<Route.Font> { FontScreen() }
                                 entry<Route.SettingsCategory> { key -> CategorySettingsScreen(key.key) }
@@ -405,9 +425,59 @@ open class MainActivity : FragmentActivity() {
                                 }
                             },
                         )
+                        val sceneState = rememberSceneState(
+                            entries = decoratedEntries,
+                            sceneStrategies = listOf(SinglePaneSceneStrategy()),
+                            onBack = navigateBack,
+                        )
+                        val gestureState = rememberNavigationEventState(
+                            currentInfo = SceneInfo(sceneState.currentScene),
+                            backInfo = sceneState.previousScenes.map { SceneInfo(it) },
+                        )
+                        NavigationBackHandler(
+                            state = gestureState,
+                            isBackEnabled = sceneState.currentScene.previousEntries.isNotEmpty(),
+                            onBackCompleted = {
+                                navOriginState.markPredictiveCommit()
+                                repeat(
+                                    decoratedEntries.size -
+                                        sceneState.currentScene.previousEntries.size,
+                                ) {
+                                    navigateBack()
+                                }
+                            },
+                        )
+                        LaunchedEffect(gestureState, sceneState, navOriginState) {
+                            snapshotFlow { gestureState.transitionState }.collect { gesture ->
+                                if (gesture is InProgress) {
+                                    navOriginState.updatePredictive(
+                                        active = true,
+                                        key = sceneState.currentScene.entries.lastOrNull()?.contentKey,
+                                        fraction = 1f - gesture.latestEvent.progress,
+                                    )
+                                } else {
+                                    navOriginState.updatePredictive(
+                                        active = false,
+                                        key = null,
+                                        fraction = 1f,
+                                    )
+                                }
+                            }
+                        }
+                        NavDisplay(
+                            sceneState = sceneState,
+                            navigationEventState = gestureState,
+                            transitionSpec = transition,
+                            popTransitionSpec = popTransition,
+                            predictivePopTransitionSpec = predictivePopTransition,
+                        )
                     }
 
-                    Box(modifier = Modifier.fillMaxSize()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .trackNavPointer(navOriginState)
+                    ) {
                         WallpaperBackgroundLayer()
                         androidx.compose.material3.Scaffold(
                             containerColor = if (LocalFolkWallpaperTokens.current != null) {
@@ -579,10 +649,25 @@ fun MainScreen(
     }
 
     val moduleEnabledCount = moduleUiState.modules.count { it.enabled }
+    val pluginEnabledCount by remember(pluginViewModel) {
+        pluginViewModel.uiState
+            .map { state -> state.plugins.count { it.enabled } }
+            .distinctUntilChanged()
+    }.collectAsStateWithLifecycle(0)
+    val homeMetamodule = remember(moduleUiState.modules) {
+        moduleUiState.modules.firstOrNull { it.metamodule && !it.remove }?.let { module ->
+            HomeMetamodule(
+                id = module.id,
+                name = module.name.ifBlank { module.id },
+                version = module.version,
+            )
+        }
+    }
 
     val navigationBadge = if (badgeEnabled) {
         NavigationBadgeState(
             superuserCount = superuserCount,
+            pluginEnabledCount = pluginEnabledCount,
             moduleEnabledCount = moduleEnabledCount,
             moduleUpdatableCount = moduleUiState.updateInfo.count { it.value.downloadUrl.isNotBlank() },
         )
@@ -615,6 +700,7 @@ fun MainScreen(
         LocalMainPagerState provides mainPagerState
     ) {
         val contentReady = rememberContentReady()
+        val renderPagerPages = contentReady || mainPagerState.isNavigating
         val floatingBarRevision = FloatingBarConfig.revision.collectAsStateWithLifecycle().value
         val navModeRevision = NavModeConfig.revision.collectAsStateWithLifecycle().value
         val navMode = remember(navModeRevision) { NavModeConfig.mode }
@@ -625,14 +711,6 @@ fun MainScreen(
             remember(floatingBarRevision) { FloatingBarConfig.glass } &&
             isRealTimeBlurAvailable()
         val floatingLiquidState = if (floatingBarGlassEnabled) rememberNavBarGlassLiquidState() else null
-        // The liquid glass style samples the page through a miuix backdrop.
-        val liquidGlassBackdrop = rememberLayerBackdrop()
-        val pagerBackdrop = liquidGlassBackdrop.takeIf {
-            floatingBarEnabled &&
-                remember(floatingBarRevision) { FloatingBarConfig.glass } &&
-                remember(floatingBarRevision) { FloatingBarConfig.glassStyle } ==
-                FloatingBarConfig.GlassStyle.Liquid
-        }
         val floatingAutoHide = remember(floatingBarRevision) { FloatingBarConfig.autoHide }
         val floatingSwipeHide = remember(floatingBarRevision) { FloatingBarConfig.swipeHide }
         val floatingBarVisibility = rememberFloatingBarVisibilityState(
@@ -641,14 +719,10 @@ fun MainScreen(
             swipeHide = floatingSwipeHide,
         )
         val pagerContent = @Composable { bottomInnerPadding: Dp ->
-            Box(
-                modifier = Modifier
-                    .navBarLiquefiable(floatingLiquidState)
-                    .then(if (pagerBackdrop != null) Modifier.layerBackdrop(pagerBackdrop) else Modifier)
-            ) {
+            Box(modifier = Modifier.navBarLiquefiable(floatingLiquidState)) {
                 HorizontalPager(
                     state = mainPagerState.pagerState,
-                    beyondViewportPageCount = if (contentReady) 3 else 0,
+                    beyondViewportPageCount = if (renderPagerPages) 3 else 0,
                     overscrollEffect = null,
                     userScrollEnabled = userScrollEnabled,
                     pageNestedScrollConnection = pageNestedScrollConnection(
@@ -662,11 +736,11 @@ fun MainScreen(
                 ) { page ->
                     val isCurrentPage = page == settledPage
                     when (destinations.getOrNull(page)) {
-                        BottomBarDestination.Home -> if (contentReady || isCurrentPage) HomePager(navController, bottomInnerPadding, isCurrentPage, superuserCount, moduleEnabledCount)
-                        BottomBarDestination.Plugin -> if (contentReady || isCurrentPage) PluginPager(bottomInnerPadding, isCurrentPage)
-                        BottomBarDestination.SuperUser -> if (contentReady || isCurrentPage) SuperUserPager(navController, bottomInnerPadding, isCurrentPage)
-                        BottomBarDestination.Module -> if (contentReady || isCurrentPage) ModulePager(bottomInnerPadding, isCurrentPage)
-                        BottomBarDestination.Setting -> if (contentReady || isCurrentPage) SettingPager(navController, bottomInnerPadding, isCurrentPage)
+                        BottomBarDestination.Home -> if (renderPagerPages || isCurrentPage) HomePager(navController, bottomInnerPadding, isCurrentPage, superuserCount, moduleEnabledCount, pluginEnabledCount, homeMetamodule)
+                        BottomBarDestination.Plugin -> if (renderPagerPages || isCurrentPage) PluginPager(bottomInnerPadding, isCurrentPage)
+                        BottomBarDestination.SuperUser -> if (renderPagerPages || isCurrentPage) SuperUserPager(navController, bottomInnerPadding, isCurrentPage)
+                        BottomBarDestination.Module -> if (renderPagerPages || isCurrentPage) ModulePager(bottomInnerPadding, isCurrentPage)
+                        BottomBarDestination.Setting -> if (renderPagerPages || isCurrentPage) SettingPager(navController, bottomInnerPadding, isCurrentPage)
                         null -> Unit
                     }
                 }
@@ -731,7 +805,6 @@ fun MainScreen(
                         FloatingBar(
                             navigationBadge = navigationBadge,
                             liquidState = floatingLiquidState,
-                            backdrop = pagerBackdrop,
                             onUserInteraction = { floatingBarVisibility.onUserInteraction() },
                         )
                     }
@@ -756,16 +829,157 @@ fun MainScreen(
     }
 }
 
+private fun navTransition(
+    layoutDirection: LayoutDirection,
+    originState: NavOriginState,
+    wallpaperActive: Boolean,
+): AnimatedContentTransitionScope<Scene<NavKey>>.() -> ContentTransform = {
+    if (wallpaperActive) {
+        wallpaperPushTransform()
+    } else {
+        val expandable = originState.hasExpandableOrigin()
+        val targetKey = targetState.entries.lastOrNull()?.contentKey
+        if (expandable) {
+            targetKey?.let { key ->
+                val origin = originState.consumePendingIfFresh()
+                if (origin != null) {
+                    originState.putOrigin(key, origin)
+                } else {
+                    originState.removeOrigin(key)
+                }
+            }
+        }
+        if (originState.hasCachedOrigin(targetKey)) {
+            containerPushTransform()
+        } else {
+            targetKey?.let(originState::removeOrigin)
+            slideTransition(layoutDirection).invoke(this)
+        }
+    }
+}
+
+private fun navPopTransition(
+    layoutDirection: LayoutDirection,
+    originState: NavOriginState,
+    wallpaperActive: Boolean,
+): AnimatedContentTransitionScope<Scene<NavKey>>.() -> ContentTransform = {
+    if (wallpaperActive) {
+        wallpaperPopTransform()
+    } else {
+        val sourceKey = initialState.entries.lastOrNull()?.contentKey
+        if (originState.hasCachedOrigin(sourceKey)) {
+            cardPopTransform()
+        } else {
+            containerPopTransform()
+        }
+    }
+}
+
+private fun navPredictivePopTransition(
+    layoutDirection: LayoutDirection,
+    originState: NavOriginState,
+    wallpaperActive: Boolean,
+): AnimatedContentTransitionScope<Scene<NavKey>>.(Int) -> ContentTransform = {
+    if (wallpaperActive) {
+        wallpaperPopTransform()
+    } else {
+        val sourceKey = initialState.entries.lastOrNull()?.contentKey
+        if (originState.hasCachedOrigin(sourceKey)) {
+            cardPopTransform()
+        } else {
+            containerPopTransform()
+        }
+    }
+}
+
+private fun containerPushTransform(): ContentTransform =
+    ContentTransform(
+        targetContentEnter = fadeIn(
+            animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
+            initialAlpha = 0.999f,
+        ),
+        initialContentExit = fadeOut(
+            animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
+            targetAlpha = 0.999f,
+        ),
+    )
+
+private fun containerPopTransform(): ContentTransform =
+    ContentTransform(
+        targetContentEnter = EnterTransition.None,
+        initialContentExit = scaleOut(
+            animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing),
+            targetScale = 0.86f,
+            transformOrigin = TransformOrigin(0.08f, 0.08f),
+        ) + fadeOut(
+            animationSpec = tween(durationMillis = 240, easing = FastOutSlowInEasing),
+        ),
+        targetContentZIndex = -1f,
+    )
+
+/**
+ * Keeps the outgoing scene alive for the card-shrink draw without transforming the whole page.
+ * The 0.999 end alpha gives the exit a duration while remaining visually opaque.
+ */
+private fun cardPopTransform(): ContentTransform =
+    ContentTransform(
+        targetContentEnter = EnterTransition.None,
+        initialContentExit = fadeOut(
+            animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing),
+            targetAlpha = 0.999f,
+        ),
+        targetContentZIndex = -1f,
+    )
+
+private fun slideTransition(
+    layoutDirection: LayoutDirection,
+): AnimatedContentTransitionScope<Scene<NavKey>>.() -> ContentTransform = {
+    val initialCount = initialState.entries.size + initialState.previousEntries.size
+    val targetCount = targetState.entries.size + targetState.previousEntries.size
+    if (targetCount < initialCount) {
+        slideBackTransform(layoutDirection)
+    } else {
+        defaultTransitionSpec<NavKey>().invoke(this)
+    }
+}
+
+private fun wallpaperPushTransform(): ContentTransform =
+    ContentTransform(
+        targetContentEnter = slideInHorizontally(initialOffsetX = { it }),
+        initialContentExit = slideOutHorizontally(targetOffsetX = { -it / 4 }) + fadeOut(),
+    )
+
+private fun wallpaperPopTransform(): ContentTransform =
+    ContentTransform(
+        targetContentEnter = fadeIn(animationSpec = tween(durationMillis = 340)),
+        initialContentExit = scaleOut(targetScale = 0.9f) + fadeOut(),
+        targetContentZIndex = -1f,
+    )
+
+private fun slideBackTransform(layoutDirection: LayoutDirection): ContentTransform =
+    ContentTransform(
+        targetContentEnter = EnterTransition.None,
+        initialContentExit = slideOutHorizontally(
+            animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing),
+            targetOffsetX = { width ->
+                if (layoutDirection == LayoutDirection.Rtl) -width else width
+            },
+        ),
+        targetContentZIndex = -1f,
+    )
 
 @Composable
 private fun MainScreenBackHandler(
     mainState: MainPagerState,
     navController: Navigator,
 ) {
-    val isPagerBackHandlerEnabled by remember {
+    val navAnimatedContentScope = LocalNavAnimatedContentScope.current
+    val isPagerBackHandlerEnabled by remember(navAnimatedContentScope) {
         derivedStateOf {
             navController.current() is Route.Main && navController.backStackSize() == 1 &&
-                mainState.selectedDestination != BottomBarDestination.Home
+                mainState.selectedDestination != BottomBarDestination.Home &&
+                !navController.wasJustPopped() &&
+                !navAnimatedContentScope.transition.isRunning
         }
     }
 

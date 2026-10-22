@@ -90,6 +90,7 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import me.weishu.kernelsu.ui.navigation3.navOrigin
 import me.weishu.kernelsu.ui.theme.FolkMotion
 import me.weishu.kernelsu.wallpaper.LocalFolkWallpaperTokens
 import me.weishu.kernelsu.wallpaper.WallpaperSurfaceRole
@@ -489,11 +490,24 @@ fun SegmentedListItem(
     leadingContent: @Composable (() -> Unit)? = null,
     trailingContent: @Composable (() -> Unit)? = null,
 ) {
+    val tokens = LocalFolkWallpaperTokens.current
+    val source = interactionSource ?: remember { MutableInteractionSource() }
+    val originModifier = if (onClick != null) {
+        modifier.navOrigin(
+            cornerRadius = 12.dp,
+            color = tokens?.group?.fill
+                ?: colors.containerColor.takeIf { it.alpha > 0f }
+                ?: MaterialTheme.colorScheme.surfaceContainer,
+            interactionSource = source,
+        )
+    } else {
+        modifier
+    }
     SegmentedRow(
-        modifier = modifier,
+        modifier = originModifier,
         clickable = onClick != null,
         enabled = enabled,
-        interactionSource = interactionSource,
+        interactionSource = source,
     ) { rowModifier, source ->
         SegmentedListItem(
             onClick = onClick ?: {},
@@ -568,11 +582,19 @@ fun SegmentedListItem(
     trailingContent: @Composable (() -> Unit)? = null,
     onLongClick: (() -> Unit)? = null,
 ) {
+    val tokens = LocalFolkWallpaperTokens.current
+    val source = interactionSource ?: remember { MutableInteractionSource() }
     SegmentedRow(
-        modifier = modifier,
+        modifier = modifier.navOrigin(
+            cornerRadius = 12.dp,
+            color = tokens?.group?.fill
+                ?: colors.containerColor.takeIf { it.alpha > 0f }
+                ?: MaterialTheme.colorScheme.surfaceContainer,
+            interactionSource = source,
+        ),
         clickable = true,
         enabled = enabled,
-        interactionSource = interactionSource,
+        interactionSource = source,
     ) { rowModifier, source ->
         SegmentedListItem(
             selected = selected,
@@ -713,11 +735,13 @@ fun SegmentedSliderItem(
     valueText: (Float) -> String,
     colors: ListItemColors = defaultSegmentedColors(),
     enabled: Boolean = true,
+    discreteSteps: Int = 19,
     onValueChange: ((Float) -> Unit)? = null,
     onValueChangeFinished: (Float) -> Unit,
 ) {
     val hoisted = onValueChange != null
-    val sliderState = rememberSliderState(value = value, trackRange = valueRange)
+    val steps = if (SliderTrackConfig.isDiscrete) discreteSteps else 0
+    val sliderState = rememberSliderState(value = value, steps = steps, trackRange = valueRange)
 
     SegmentedListItem(
         enabled = enabled,
@@ -730,7 +754,7 @@ fun SegmentedSliderItem(
                 summary?.let { Text(it) }
                 if (hoisted) {
                     // The caller owns both the thumb and label; no saved slider value may override it.
-                    val state = remember(valueRange) { SliderState(value = value, trackRange = valueRange) }
+                    val state = remember(valueRange, steps) { SliderState(value = value, steps = steps, trackRange = valueRange) }
                     if (state.value != value) state.value = value
                     // A release normally reports itself; this covers the gesture the scroll container took over.
                     SliderCommitEffect(value) { onValueChangeFinished(state.value) }

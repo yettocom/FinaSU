@@ -23,22 +23,6 @@ sealed interface Route : NavKey, Parcelable {
 
     @Parcelize
     @Serializable
-    data object Home : Route
-
-    @Parcelize
-    @Serializable
-    data object SuperUser : Route
-
-    @Parcelize
-    @Serializable
-    data object Module : Route
-
-    @Parcelize
-    @Serializable
-    data object Settings : Route
-
-    @Parcelize
-    @Serializable
     data object Language : Route
 
     @Parcelize
@@ -52,6 +36,10 @@ sealed interface Route : NavKey, Parcelable {
     @Parcelize
     @Serializable
     data object Susfs : Route
+
+    @Parcelize
+    @Serializable
+    data object UtsView : Route
 
     @Parcelize
     @Serializable
@@ -135,6 +123,10 @@ sealed interface Route : NavKey, Parcelable {
     @Parcelize
     @Serializable
     data object ModuleRepo : Route
+
+    @Parcelize
+    @Serializable
+    data object KernelModules : Route
 
     @Parcelize
     @Serializable

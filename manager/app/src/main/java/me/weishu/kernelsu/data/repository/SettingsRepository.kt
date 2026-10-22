@@ -24,6 +24,7 @@ interface SettingsRepository {
     var hideHomeFingerprint: Boolean
     var hideHomeZygisk: Boolean
     var hideHomeSusfs: Boolean
+    var hideHomeMount: Boolean
     var enablePredictiveBack: Boolean
     var enableNavigationBadge: Boolean
     var pageScale: Float
@@ -98,6 +99,7 @@ interface SettingsRepository {
     suspend fun getFolkMountStatus(): Result<FolkMountStatus>
     suspend fun getFolkZygiskStatus(): Result<FolkZygiskStatus>
     suspend fun setFolkZygiskEnabled(enabled: Boolean): Result<Unit>
+    suspend fun recoverFolkZygisk(): Result<Unit>
     suspend fun getSuiStatus(): Result<SuiStatus>
     suspend fun setSuiEnabled(enabled: Boolean): Result<Unit>
     suspend fun repairSui(): Result<Unit>

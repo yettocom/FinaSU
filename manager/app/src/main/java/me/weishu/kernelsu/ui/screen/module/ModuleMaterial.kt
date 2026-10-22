@@ -58,6 +58,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.Cloud
+import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonColors
@@ -93,18 +94,23 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.FixedScale
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -136,8 +142,12 @@ import me.weishu.kernelsu.ui.component.material.FolkTextButton
 import me.weishu.kernelsu.ui.component.material.SearchAppBar
 import me.weishu.kernelsu.ui.component.material.SnackBarHost
 import me.weishu.kernelsu.ui.component.material.rememberSearchAppBarScrollBehavior
-import me.weishu.kernelsu.ui.component.module.splicedLazyColumnGroup
 import me.weishu.kernelsu.ui.component.module.TwoColumnGrid
+import me.weishu.kernelsu.ui.component.module.splicedLazyColumnGroup
+import me.weishu.kernelsu.ui.navigation3.LocalNavOriginState
+import me.weishu.kernelsu.ui.navigation3.NavOrigin
+import me.weishu.kernelsu.ui.navigation3.captureNavOrigin
+import me.weishu.kernelsu.ui.navigation3.navThemeSignature
 import me.weishu.kernelsu.ui.util.reboot
 
 @SuppressLint("StringFormatInvalid")
@@ -287,8 +297,34 @@ fun ModulePagerMaterial(
                 onClearClick = actions.onClearSearch,
                 snackbarHostState = snackBarHost,
                 navigationIcon = {
+                    val originState = LocalNavOriginState.current
+                    val density = LocalDensity.current
+                    val view = LocalView.current
+                    val originColorScheme = MaterialTheme.colorScheme
+                    val originColor = originColorScheme.surfaceContainer
+                    val originThemeSignature = navThemeSignature(originColorScheme)
+                    var originBounds by remember { mutableStateOf(Rect.Zero) }
                     FolkIconButton(
-                        onClick = { actions.onOpenRepo() }
+                        onClick = {
+                            val bounds = if (originBounds != Rect.Zero) {
+                                originBounds
+                            } else {
+                                with(density) { Rect(24.dp.toPx(), 140.dp.toPx(), 144.dp.toPx(), 260.dp.toPx()) }
+                            }
+                            originState.recordOrigin(
+                                captureNavOrigin(
+                                    view = view,
+                                    rect = bounds,
+                                    cornerRadius = with(density) { 20.dp.toPx() },
+                                    color = originColor,
+                                    themeSignature = originThemeSignature,
+                                    originId = "module-store",
+                                ),
+                            )
+                            actions.onOpenRepo()
+                        },
+                        modifier = Modifier
+                            .onGloballyPositioned { originBounds = it.boundsInRoot() },
                     ) {
                         Icon(
                             imageVector = Icons.Outlined.Cloud,
@@ -297,6 +333,39 @@ fun ModulePagerMaterial(
                     }
                 },
                 actions = {
+                    val scope = rememberCoroutineScope()
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(androidx.compose.foundation.shape.CircleShape)
+                            .combinedClickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = LocalIndication.current,
+                                onClickLabel = stringResource(R.string.kernel_modules_entry),
+                                onLongClickLabel = stringResource(R.string.kernel_modules_entry_hint),
+                                onLongClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    scope.launch {
+                                        snackBarHost.showSnackbar(
+                                            resource.getString(R.string.kernel_modules_entry_long_press)
+                                        )
+                                    }
+                                },
+                                onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    actions.onOpenKernelModules()
+                                },
+                            )
+                            .semantics {
+                                this.contentDescription = resource.getString(R.string.kernel_modules_entry)
+                            },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Memory,
+                            contentDescription = null,
+                        )
+                    }
                     FolkIconButton(
                         onClick = { showSortSheet = true }
                     ) {

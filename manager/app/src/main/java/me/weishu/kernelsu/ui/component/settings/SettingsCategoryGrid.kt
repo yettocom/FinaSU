@@ -26,7 +26,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import me.weishu.kernelsu.ui.component.material.TonalCard
 import me.weishu.kernelsu.ui.component.material.folkPressScale
+import me.weishu.kernelsu.ui.navigation3.navOrigin
 import me.weishu.kernelsu.ui.theme.FolkShape
+import me.weishu.kernelsu.wallpaper.LocalFolkWallpaperTokens
 
 /** One tappable entry in [SettingsCategoryGrid]. */
 data class SettingsCategoryEntry(
@@ -81,10 +83,17 @@ private fun CategoryCell(
 ) {
     val haptic = LocalHapticFeedback.current
     val interactionSource = remember { MutableInteractionSource() }
+    val originColor = LocalFolkWallpaperTokens.current?.group?.fill
+        ?: MaterialTheme.colorScheme.surfaceBright
 
     Column(
         modifier = modifier
             .clip(FolkShape.Corner12)
+            .navOrigin(
+                cornerRadius = 12.dp,
+                color = originColor,
+                interactionSource = interactionSource,
+            )
             .folkPressScale(interactionSource)
             .clickable(
                 role = Role.Button,

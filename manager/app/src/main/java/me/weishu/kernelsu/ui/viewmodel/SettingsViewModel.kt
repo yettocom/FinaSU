@@ -27,7 +27,7 @@ import me.weishu.kernelsu.ui.screen.settings.SettingsUiState
 import me.weishu.kernelsu.ui.theme.ColorMode
 
 class SettingsViewModel(
-    private val repo: SettingsRepository = SettingsRepositoryImpl()
+    private val repo: SettingsRepository = SettingsRepositoryImpl(),
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
@@ -142,6 +142,7 @@ class SettingsViewModel(
                     hideHomeFingerprint = repo.hideHomeFingerprint,
                     hideHomeZygisk = repo.hideHomeZygisk,
                     hideHomeSusfs = repo.hideHomeSusfs,
+                    hideHomeMount = repo.hideHomeMount,
                     susfsDetected = susfsDetected,
                     colorStyle = colorStyle,
                     colorSpec = colorSpec,
@@ -198,8 +199,40 @@ class SettingsViewModel(
                     folkZygiskReadError = status.isFailure,
                     folkZygiskRebootPending = it.folkZygiskRebootPending || result.isSuccess)
             }
-            Toast.makeText(ksuApp, if (result.isSuccess) R.string.folkzygisk_reboot_required
-                else R.string.folkzygisk_write_failed, Toast.LENGTH_LONG).show()
+            val message = if (result.isSuccess) {
+                ksuApp.getString(R.string.folkzygisk_reboot_required)
+            } else {
+                result.exceptionOrNull()?.message
+                    ?.takeIf { it.isNotBlank() }
+                    ?: ksuApp.getString(R.string.folkzygisk_write_failed)
+            }
+            Toast.makeText(ksuApp, message, Toast.LENGTH_LONG).show()
+        }
+    }
+
+    fun recoverFolkZygisk() {
+        if (_uiState.value.isFolkZygiskWriting || _uiState.value.isFolkZygiskLoading) return
+        ++refreshGeneration
+        _uiState.update { it.copy(isFolkZygiskWriting = true) }
+        viewModelScope.launch {
+            val result = repo.recoverFolkZygisk()
+            val status = repo.getFolkZygiskStatus()
+            _uiState.update {
+                it.copy(
+                    isFolkZygiskWriting = false,
+                    folkZygiskStatus = status.getOrNull(),
+                    folkZygiskReadError = status.isFailure,
+                    folkZygiskRebootPending = it.folkZygiskRebootPending || result.isSuccess,
+                )
+            }
+            val message = if (result.isSuccess) {
+                ksuApp.getString(R.string.folkzygisk_recovery_restart_required)
+            } else {
+                result.exceptionOrNull()?.message
+                    ?.takeIf { it.isNotBlank() }
+                    ?: ksuApp.getString(R.string.folkzygisk_write_failed)
+            }
+            Toast.makeText(ksuApp, message, Toast.LENGTH_LONG).show()
         }
     }
 
@@ -376,6 +409,11 @@ class SettingsViewModel(
     fun setHideHomeSusfs(hidden: Boolean) {
         repo.hideHomeSusfs = hidden
         _uiState.update { it.copy(hideHomeSusfs = hidden) }
+    }
+
+    fun setHideHomeMount(hidden: Boolean) {
+        repo.hideHomeMount = hidden
+        _uiState.update { it.copy(hideHomeMount = hidden) }
     }
 
     fun setSuCompatMode(mode: Int) {

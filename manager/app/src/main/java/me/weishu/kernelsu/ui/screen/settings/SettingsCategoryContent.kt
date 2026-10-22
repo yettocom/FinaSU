@@ -457,6 +457,15 @@ fun AppearanceCategoryContent(uiState: SettingsUiState, actions: SettingsScreenA
                 onCheckedChange = actions.onSetHideHomeSusfs,
             )
         }
+        item(visible = uiState.folkMountStatus != null && !uiState.folkMountReadError) {
+            SegmentedSwitchItem(
+                icon = Icons.Filled.Layers,
+                title = stringResource(R.string.settings_hide_home_mount),
+                summary = stringResource(R.string.settings_hide_home_mount_summary),
+                checked = uiState.hideHomeMount,
+                onCheckedChange = actions.onSetHideHomeMount,
+            )
+        }
     }
 
     if (showLauncherIconDialog) {
@@ -747,6 +756,19 @@ fun FunctionCategoryContent(uiState: SettingsUiState, actions: SettingsScreenAct
                         supportingContent = { Text(nomountSummary) },
                         leadingContent = { Icon(Icons.Filled.Layers, null) },
                         onClick = actions.onOpenNomount,
+                        trailingContent = {
+                            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null)
+                        },
+                    )
+                },
+                {
+                    // UTS View has enough configuration that a switch in the
+                    // settings list would misrepresent it as a single toggle.
+                    SegmentedListItem(
+                        headlineContent = { Text(stringResource(id = R.string.settings_uts_view)) },
+                        supportingContent = { Text(stringResource(id = R.string.settings_uts_view_summary)) },
+                        leadingContent = { Icon(Icons.Rounded.TextFields, null) },
+                        onClick = actions.onOpenUtsView,
                         trailingContent = {
                             Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null)
                         },

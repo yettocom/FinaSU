@@ -2,10 +2,12 @@ package me.weishu.kernelsu.ui.screen.home
 
 import android.content.Intent
 import android.widget.Toast
+import androidx.activity.compose.LocalActivity
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -14,6 +16,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.Dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlin.time.Duration.Companion.milliseconds
@@ -40,6 +43,8 @@ fun HomePager(
     isCurrentPage: Boolean = true,
     superuserCount: Int = 0,
     moduleEnabledCount: Int = 0,
+    pluginEnabledCount: Int = 0,
+    metamodule: HomeMetamodule? = null,
 ) {
     val viewModel = viewModel<HomeViewModel>()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -58,6 +63,7 @@ fun HomePager(
     val scope = rememberCoroutineScope()
     val latestIsCurrentPage by rememberUpdatedState(isCurrentPage)
     val initialResumeHandled = rememberSaveable { mutableStateOf(false) }
+    val activity = LocalActivity.current
 
     var hasActivated by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(isCurrentPage) {
@@ -73,7 +79,7 @@ fun HomePager(
         }
     }
 
-    LifecycleResumeEffect(Unit) {
+    LifecycleResumeEffect(Unit, activity ?: LocalLifecycleOwner.current) {
         if (initialResumeHandled.value && latestIsCurrentPage) {
             CapabilityRepository.refresh()
             viewModel.refresh()
@@ -104,12 +110,17 @@ fun HomePager(
         onSusfs = { navigator.push(Route.Susfs) },
     )
 
+    val state = remember(uiState, metamodule) {
+        uiState.copy(mount = uiState.mount.copy(metamodule = metamodule))
+    }
+
     HomePagerMaterial(
-        state = uiState,
+        state = state,
         actions = actions,
         bottomInnerPadding = bottomInnerPadding,
         superuserCount = superuserCount,
         moduleEnabledCount = moduleEnabledCount,
+        pluginEnabledCount = pluginEnabledCount,
         metrics = metrics,
     )
 }
