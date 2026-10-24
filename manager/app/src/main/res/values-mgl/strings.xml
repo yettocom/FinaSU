@@ -38,6 +38,7 @@
     <string name="home_unsupported_reason">KernelSU 现在只支持 GKI 心之契约，但你可以为 GKI 法器补丁镜像</string>
     <string name="home_device_model">法器型号</string>
     <string name="home_kernel">心之契约版本</string>
+    <string name="home_kernel_full_version">心之契约全貌</string>
     <string name="home_manager_version">管理器版本</string>
     <string name="home_fingerprint">魔法界指纹</string>
     <string name="home_selinux_status">SELinux 状态</string>
@@ -276,6 +277,12 @@
     <string name="settings_selinux_hide_summary">阻止应用窥见 SELinux 的修改</string>
     <string name="settings_selinux_hide_reboot_required">重新觉醒后生效</string>
     <string name="settings_selinux_hide_failed">错误：%d</string>
+
+    <string name="settings_mount_view_filter">隐遁挂载之录</string>
+    <string name="settings_mount_view_filter_summary">自应用与幽闭进程之 /proc 挂载境中，隐去本机 root 与模块所留挂载</string>
+    <string name="settings_mount_view_filter_unavailable">此内核不授挂载视图过滤之能</string>
+    <string name="settings_mount_view_filter_failed">挂载视图过滤启用未成</string>
+    <string name="settings_mount_view_filter_save_failed">挂载视图过滤已易，然未能存于重启之制</string>
     <string name="settings_selinux_mode">SELinux 模式</string>
     <string name="settings_selinux_mode_enforcing">强制守护</string>
     <string name="settings_selinux_mode_permissive">宽容模式</string>
@@ -323,7 +330,7 @@
     <string name="nomount_driver_kind_builtin">心之契约内建</string>
     <string name="nomount_driver_kind_module">心之契约结晶</string>
     <string name="nomount_unavailable_no_asset">本安装包没有 %1$s 对应的 NoMount 魔法阵；请改用「自动」或「内建 Folk Mount」。</string>
-    <string name="nomount_unavailable_outdated">心之契约携带的是 NoMount %1$s，而本版本需要 API 21 及以上；请更新心之契约。</string>
+    <string name="nomount_unavailable_outdated">心之契约携带的是 NoMount %1$s，而本版本需要 API 22 及以上；请更新心之契约。</string>
     <string name="nomount_unavailable_not_loaded">驱动尚未加载；重新觉醒或注入一次即可唤醒。</string>
     <string name="nomount_unavailable_unknown_kmi">无法把当前心之契约版本匹配到 NoMount 魔法阵。</string>
     <string name="nomount_driver_unavailable">驱动不可用（%1$s）</string>

@@ -38,6 +38,7 @@
     <string name="home_unsupported_reason">KernelSU 眼下只认 GKI 秘酱料，不过 GKI 灶具的镜像还是能补的</string>
     <string name="home_device_model">灶具型号</string>
     <string name="home_kernel">秘酱料版本</string>
+    <string name="home_kernel_full_version">秘酱料全谱</string>
     <string name="home_manager_version">掌柜版本</string>
     <string name="home_fingerprint">饭庄指纹</string>
     <string name="home_selinux_status">SELinux 状态</string>
@@ -276,6 +277,12 @@
     <string name="settings_selinux_hide_summary">别让应用瞧出 SELinux 动过手脚</string>
     <string name="settings_selinux_hide_reboot_required">重新开火才认</string>
     <string name="settings_selinux_hide_failed">出岔子了：%d</string>
+
+    <string name="settings_mount_view_filter">把挂载记录藏起来</string>
+    <string name="settings_mount_view_filter_summary">别让应用和隔离进程从 /proc 挂载视图里瞧见本机 root 和模块的挂载</string>
+    <string name="settings_mount_view_filter_unavailable">这内核做不了挂载记录过滤</string>
+    <string name="settings_mount_view_filter_failed">挂载记录过滤没开成</string>
+    <string name="settings_mount_view_filter_save_failed">挂载记录过滤动过了，但没存进重启配方</string>
     <string name="settings_selinux_mode">SELinux 模式</string>
     <string name="settings_selinux_mode_enforcing">严格检查</string>
     <string name="settings_selinux_mode_permissive">宽松模式</string>
@@ -323,7 +330,7 @@
     <string name="nomount_driver_kind_builtin">秘酱料内建</string>
     <string name="nomount_driver_kind_module">秘酱料模块</string>
     <string name="nomount_unavailable_no_asset">这包货没配 %1$s 的 NoMount 模块；改用「随灶」或「内建 Folk Mount」。</string>
-    <string name="nomount_unavailable_outdated">秘酱料带的是 NoMount %1$s，这版得要 API 21 往上；把秘酱料换新。</string>
+    <string name="nomount_unavailable_outdated">秘酱料带的是 NoMount %1$s，这版得要 API 22 往上；把秘酱料换新。</string>
     <string name="nomount_unavailable_not_loaded">驱动还没上灶；重新开火或注入一回就带起来了。</string>
     <string name="nomount_unavailable_unknown_kmi">没给这秘酱料版本配上对口的 NoMount 模块。</string>
     <string name="nomount_driver_unavailable">驱动使不上（%1$s）</string>

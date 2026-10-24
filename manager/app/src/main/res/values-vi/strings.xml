@@ -38,6 +38,7 @@
     <string name="home_unsupported_reason">KernelSU hiện tại chỉ hỗ trợ Kernel GKI, nhưng bạn có thể patch file .img của thiết bị GKI mà bạn cần.</string>
     <string name="home_device_model">Mẫu thiết bị</string>
     <string name="home_kernel">Phiên bản Kernel</string>
+    <string name="home_kernel_full_version">Bản dựng kernel</string>
     <string name="home_manager_version">Phiên bản Trình quản lý</string>
     <string name="home_fingerprint">Fingerprint</string>
     <string name="home_selinux_status">Trạng thái SELinux</string>
@@ -276,6 +277,12 @@
     <string name="settings_selinux_hide_summary">Ngăn chặn các ứng dụng phát hiện các thay đổi của SELinux.</string>
     <string name="settings_selinux_hide_reboot_required">Khởi động lại để có hiệu lực!</string>
     <string name="settings_selinux_hide_failed">Lỗi: %d</string>
+
+    <string name="settings_mount_view_filter">Ẩn bản ghi gắn kết</string>
+    <string name="settings_mount_view_filter_summary">Xóa bản ghi gắn kết của root và mô-đun khỏi chế độ xem /proc của ứng dụng và tiến trình cô lập</string>
+    <string name="settings_mount_view_filter_unavailable">Lọc chế độ xem gắn kết không khả dụng trên kernel này</string>
+    <string name="settings_mount_view_filter_failed">Không thể bật lọc chế độ xem gắn kết</string>
+    <string name="settings_mount_view_filter_save_failed">Đã thay đổi lọc chế độ xem gắn kết nhưng không thể lưu cho lần khởi động lại</string>
     <string name="settings_selinux_mode">Chế độ SELinux</string>
     <string name="settings_selinux_mode_enforcing">Enforcing</string>
     <string name="settings_selinux_mode_permissive">Permissive</string>
@@ -323,7 +330,7 @@
     <string name="nomount_driver_kind_builtin">tích hợp trong kernel</string>
     <string name="nomount_driver_kind_module">module kernel</string>
     <string name="nomount_unavailable_no_asset">Gói này không có module NoMount cho %1$s; hãy dùng Tự động hoặc Folk Mount tích hợp.</string>
-    <string name="nomount_unavailable_outdated">Kernel có NoMount %1$s nhưng bản dựng này cần API 21 trở lên; hãy cập nhật kernel.</string>
+    <string name="nomount_unavailable_outdated">Kernel có NoMount %1$s nhưng bản dựng này cần API 22 trở lên; hãy cập nhật kernel.</string>
     <string name="nomount_unavailable_not_loaded">Trình điều khiển chưa được tải; hãy khởi động lại hoặc chèn một lần để tải nó.</string>
     <string name="nomount_unavailable_unknown_kmi">Không thể khớp phiên bản kernel với một module NoMount.</string>
     <string name="nomount_driver_unavailable">Trình điều khiển không khả dụng (%1$s)</string>

@@ -54,6 +54,7 @@ import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material.icons.filled.Vibration
 import androidx.compose.material.icons.filled.Wallpaper
 import androidx.compose.material.icons.filled.WaterDrop
+import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material.icons.filled.Widgets
 import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.rounded.Apps
@@ -861,6 +862,16 @@ val settingsSearchIndex: List<SettingsSearchEntry> = buildList {
             aliases = listOf("uts", "uname", "kernel version", "内核版本", "伪装"),
         )
     )
+    add(
+        SettingsCategory.FUNCTION.page(
+            id = "function.netisolate",
+            titleRes = R.string.settings_netisolate,
+            summaryRes = R.string.settings_netisolate_summary,
+            icon = Icons.Filled.WifiOff,
+            route = Route.NetIsolate,
+            aliases = listOf("network", "isolate", "offline", "uid", "网络隔离", "断网"),
+        )
+    )
 
     // Security
     add(
@@ -870,6 +881,15 @@ val settingsSearchIndex: List<SettingsSearchEntry> = buildList {
             summaryRes = R.string.settings_selinux_hide_summary,
             icon = Icons.Filled.Security,
             aliases = listOf("selinux", "hide", "spoof"),
+        )
+    )
+    add(
+        SettingsCategory.FUNCTION.row(
+            id = "function.mount_view_filter",
+            titleRes = R.string.settings_mount_view_filter,
+            summaryRes = R.string.settings_mount_view_filter_summary,
+            icon = Icons.Rounded.VisibilityOff,
+            aliases = listOf("mount", "hide", "proc", "mountinfo", "mounts", "挂载"),
         )
     )
     add(

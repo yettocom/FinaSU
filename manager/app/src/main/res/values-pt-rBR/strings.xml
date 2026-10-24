@@ -38,6 +38,7 @@
     <string name="home_unsupported_reason">KernelSU suporta apenas kernels GKI agora</string>
     <string name="home_device_model">Modelo do dispositivo</string>
     <string name="home_kernel">Versão do kernel</string>
+    <string name="home_kernel_full_version">Compilação do kernel</string>
     <string name="home_manager_version">Versão do gerenciador</string>
     <string name="home_fingerprint">Impressão digital</string>
     <string name="home_selinux_status">Status do SELinux</string>
@@ -278,6 +279,12 @@
     <string name="settings_selinux_hide_summary">Impedir que os aplicativos detectem modificações do SELinux</string>
     <string name="settings_selinux_hide_reboot_required">Reinicie para entrar em vigor</string>
     <string name="settings_selinux_hide_failed">Erro: %d</string>
+
+    <string name="settings_mount_view_filter">Ocultar registros de montagem</string>
+    <string name="settings_mount_view_filter_summary">Remover registros de montagem do root e de módulos das visualizações /proc de aplicativos e processos isolados</string>
+    <string name="settings_mount_view_filter_unavailable">A filtragem da visualização de montagem não está disponível neste kernel</string>
+    <string name="settings_mount_view_filter_failed">Falha ao ativar a filtragem da visualização de montagem</string>
+    <string name="settings_mount_view_filter_save_failed">A filtragem da visualização de montagem foi alterada, mas não pôde ser salva para a reinicialização</string>
     <string name="settings_selinux_mode">Modo do SELinux</string>
     <string name="settings_selinux_mode_enforcing">Impondo</string>
     <string name="settings_selinux_mode_permissive">Permissivo</string>
@@ -325,7 +332,7 @@
     <string name="nomount_driver_kind_builtin">integrado no kernel</string>
     <string name="nomount_driver_kind_module">módulo do kernel</string>
     <string name="nomount_unavailable_no_asset">Este pacote não inclui nenhum módulo NoMount para %1$s; use o Folk Mount Automático ou Integrado.</string>
-    <string name="nomount_unavailable_outdated">O kernel inclui o NoMount %1$s, mas esta compilação exige a API 21 ou mais recente; atualize o kernel.</string>
+    <string name="nomount_unavailable_outdated">O kernel inclui o NoMount %1$s, mas esta compilação exige a API 22 ou mais recente; atualize o kernel.</string>
     <string name="nomount_unavailable_not_loaded">O driver ainda não foi carregado; reinicie ou injete uma vez para carregá-lo.</string>
     <string name="nomount_unavailable_unknown_kmi">Não foi possível corresponder a versão do kernel a um módulo NoMount.</string>
     <string name="nomount_driver_unavailable">Driver indisponível (%1$s)</string>

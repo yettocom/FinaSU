@@ -38,6 +38,7 @@
     <string name="home_unsupported_reason">KernelSU 现在只认 GKI 内核喵，不过人家能帮你给 GKI 设备打补丁镜像哒</string>
     <string name="home_device_model">设备型号喵</string>
     <string name="home_kernel">内核版本喵</string>
+    <string name="home_kernel_full_version">内核完整版本喵</string>
     <string name="home_manager_version">管理器版本喵</string>
     <string name="home_fingerprint">系统指纹喵</string>
     <string name="home_selinux_status">SELinux 状态喵</string>
@@ -276,6 +277,12 @@
     <string name="settings_selinux_hide_summary">不让应用发现 SELinux 被改过喵</string>
     <string name="settings_selinux_hide_reboot_required">重启生效喵</string>
     <string name="settings_selinux_hide_failed">出错啦喵：%d</string>
+
+    <string name="settings_mount_view_filter">藏起挂载记录喵</string>
+    <string name="settings_mount_view_filter_summary">从应用和隔离进程的 /proc 挂载视图里，把本机 root 和模块的挂载记录藏掉喵</string>
+    <string name="settings_mount_view_filter_unavailable">这个内核用不了挂载视图过滤喵</string>
+    <string name="settings_mount_view_filter_failed">挂载视图过滤没开起来喵</string>
+    <string name="settings_mount_view_filter_save_failed">挂载视图过滤变啦，但没法存到重启配置里喵</string>
     <string name="settings_selinux_mode">SELinux 模式喵</string>
     <string name="settings_selinux_mode_enforcing">强制开着喵！</string>
     <string name="settings_selinux_mode_permissive">宽松模式喵！</string>
@@ -323,7 +330,7 @@
     <string name="nomount_driver_kind_builtin">内核内建</string>
     <string name="nomount_driver_kind_module">内核模块</string>
     <string name="nomount_unavailable_no_asset">这个安装包里没有 %1$s 对应的 NoMount 模块喵；改用「自动」或「内建 Folk Mount」吧</string>
-    <string name="nomount_unavailable_outdated">内核里带的是 NoMount %1$s，但本版本需要 API 21 及以上喵；先升级内核哦</string>
+    <string name="nomount_unavailable_outdated">内核里带的是 NoMount %1$s，但本版本需要 API 22 及以上喵；先升级内核哦</string>
     <string name="nomount_unavailable_not_loaded">驱动还没加载喵；重启或注入一次就能加载哒</string>
     <string name="nomount_unavailable_unknown_kmi">没法把当前内核版本匹配到 NoMount 模块喵</string>
     <string name="nomount_driver_unavailable">驱动不可用（%1$s）</string>

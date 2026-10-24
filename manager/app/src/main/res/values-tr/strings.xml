@@ -38,6 +38,7 @@
     <string name="home_unsupported_reason">KernelSU şimdilik sadece GKI çekirdeklerini destekliyor</string>
     <string name="home_device_model">Cihaz modeli</string>
     <string name="home_kernel">Çekirdek Versiyonu</string>
+    <string name="home_kernel_full_version">Çekirdek derlemesi</string>
     <string name="home_manager_version">Yönetici sürümü</string>
     <string name="home_fingerprint">Parmak izi</string>
     <string name="home_selinux_status">SELinux durumu</string>
@@ -278,6 +279,12 @@
     <string name="settings_selinux_hide_summary">Uygulamaların SELinux değişikliklerini algılamasını önle</string>
     <string name="settings_selinux_hide_reboot_required">Etkili olması için yeniden başlatın</string>
     <string name="settings_selinux_hide_failed">Hata: %d</string>
+
+    <string name="settings_mount_view_filter">Bağlama kayıtlarını gizle</string>
+    <string name="settings_mount_view_filter_summary">Uygulamaların ve yalıtılmış süreçlerin /proc bağlama görünümlerinden root ve modül bağlama kayıtlarını kaldır</string>
+    <string name="settings_mount_view_filter_unavailable">Bağlama görünümü filtreleme bu çekirdekte kullanılamıyor</string>
+    <string name="settings_mount_view_filter_failed">Bağlama görünümü filtreleme etkinleştirilemedi</string>
+    <string name="settings_mount_view_filter_save_failed">Bağlama görünümü filtreleme değiştirildi ancak yeniden başlatma için kaydedilemedi</string>
     <string name="settings_selinux_mode">SELinux modu</string>
     <string name="settings_selinux_mode_enforcing">Etkin (Enforcing)</string>
     <string name="settings_selinux_mode_permissive">Serbest (Permissive)</string>
@@ -325,7 +332,7 @@
     <string name="nomount_driver_kind_builtin">çekirdeğe yerleşik</string>
     <string name="nomount_driver_kind_module">çekirdek modülü</string>
     <string name="nomount_unavailable_no_asset">Bu paket %1$s için NoMount modülü içermiyor; Otomatik veya Yerleşik Folk Mount kullanın.</string>
-    <string name="nomount_unavailable_outdated">Çekirdek NoMount %1$s taşıyor ancak bu yapı API 21 veya daha yenisini gerektiriyor; çekirdeği güncelleyin.</string>
+    <string name="nomount_unavailable_outdated">Çekirdek NoMount %1$s taşıyor ancak bu yapı API 22 veya daha yenisini gerektiriyor; çekirdeği güncelleyin.</string>
     <string name="nomount_unavailable_not_loaded">Sürücü henüz yüklenmedi; yüklemek için yeniden başlatın veya bir kez enjekte edin.</string>
     <string name="nomount_unavailable_unknown_kmi">Çekirdek sürümü bir NoMount modülüyle eşleştirilemedi.</string>
     <string name="nomount_driver_unavailable">Sürücü kullanılamıyor (%1$s)</string>

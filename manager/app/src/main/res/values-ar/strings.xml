@@ -38,6 +38,7 @@
     <string name="home_unsupported_reason">KernelSU يدعم GKI kernels فقط</string>
     <string name="home_device_model">طراز الجهاز</string>
     <string name="home_kernel">إصدار النواة</string>
+    <string name="home_kernel_full_version">بناء النواة الكامل</string>
     <string name="home_manager_version">إصدار المدير</string>
     <string name="home_fingerprint">البصمة</string>
     <string name="home_selinux_status">وضع SELinux</string>
@@ -278,6 +279,12 @@
     <string name="settings_selinux_hide_summary">منع التطبيقات من اكتشاف تعديلات SELinux</string>
     <string name="settings_selinux_hide_reboot_required">أعد التشغيل لتفعيل التغيير</string>
     <string name="settings_selinux_hide_failed">خطأ: %d</string>
+
+    <string name="settings_mount_view_filter">إخفاء سجلات التركيب</string>
+    <string name="settings_mount_view_filter_summary">إزالة سجلات تركيب root والوحدات من عروض /proc للتطبيقات والعمليات المعزولة</string>
+    <string name="settings_mount_view_filter_unavailable">تصفية عرض التركيب غير متاحة على هذا النواة</string>
+    <string name="settings_mount_view_filter_failed">فشل تفعيل تصفية عرض التركيب</string>
+    <string name="settings_mount_view_filter_save_failed">تم تغيير تصفية عرض التركيب لكن تعذر حفظه لإعادة التشغيل</string>
     <string name="settings_selinux_mode">وضع SELinux</string>
     <string name="settings_selinux_mode_enforcing">مفروض</string>
     <string name="settings_selinux_mode_permissive">متساهل</string>
@@ -325,7 +332,7 @@
     <string name="nomount_driver_kind_builtin">مدمج في النواة</string>
     <string name="nomount_driver_kind_module">وحدة نواة</string>
     <string name="nomount_unavailable_no_asset">لا تتضمن هذه الحزمة وحدة NoMount لـ %1$s؛ استخدم Folk Mount التلقائي أو المدمج.</string>
-    <string name="nomount_unavailable_outdated">تحمل النواة NoMount %1$s لكن هذا الإصدار يتطلب API 21 أو أحدث؛ حدِّث النواة.</string>
+    <string name="nomount_unavailable_outdated">تحمل النواة NoMount %1$s لكن هذا الإصدار يتطلب API 22 أو أحدث؛ حدِّث النواة.</string>
     <string name="nomount_unavailable_not_loaded">لم يُحمَّل المشغّل بعد؛ أعد التشغيل أو احقن مرة واحدة لتحميله.</string>
     <string name="nomount_unavailable_unknown_kmi">تعذّر مطابقة إصدار النواة مع وحدة NoMount.</string>
     <string name="nomount_driver_unavailable">المشغّل غير متاح (%1$s)</string>

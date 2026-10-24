@@ -38,6 +38,7 @@
     <string name="home_unsupported_reason">KernelSU sekarang hanya mendukung kernel GKI, tetapi Anda dapat menambal image untuk perangkat GKI.</string>
     <string name="home_device_model">Model perangkat</string>
     <string name="home_kernel">Versi kernel</string>
+    <string name="home_kernel_full_version">Build kernel lengkap</string>
     <string name="home_manager_version">Versi manajer</string>
     <string name="home_fingerprint">Sidik jari</string>
     <string name="home_selinux_status">Status SELinux</string>
@@ -276,6 +277,12 @@
     <string name="settings_selinux_hide_summary">Mencegah aplikasi mendeteksi modifikasi SELinux</string>
     <string name="settings_selinux_hide_reboot_required">Mulai ulang untuk menerapkan</string>
     <string name="settings_selinux_hide_failed">Kesalahan: %d</string>
+
+    <string name="settings_mount_view_filter">Sembunyikan catatan mount</string>
+    <string name="settings_mount_view_filter_summary">Hapus catatan mount root dan modul dari tampilan /proc aplikasi dan proses terisolasi</string>
+    <string name="settings_mount_view_filter_unavailable">Pemfilteran tampilan mount tidak tersedia pada kernel ini</string>
+    <string name="settings_mount_view_filter_failed">Gagal mengaktifkan pemfilteran tampilan mount</string>
+    <string name="settings_mount_view_filter_save_failed">Pemfilteran tampilan mount berubah tetapi tidak dapat disimpan untuk reboot</string>
     <string name="settings_selinux_mode">Mode SELinux</string>
     <string name="settings_selinux_mode_enforcing">Enforcing</string>
     <string name="settings_selinux_mode_permissive">Permissive</string>
@@ -323,7 +330,7 @@
     <string name="nomount_driver_kind_builtin">bawaan kernel</string>
     <string name="nomount_driver_kind_module">modul kernel</string>
     <string name="nomount_unavailable_no_asset">Paket ini tidak menyertakan modul NoMount untuk %1$s; gunakan Otomatis atau Folk Mount bawaan.</string>
-    <string name="nomount_unavailable_outdated">Kernel membawa NoMount %1$s tetapi build ini memerlukan API 21 atau lebih baru; perbarui kernel.</string>
+    <string name="nomount_unavailable_outdated">Kernel membawa NoMount %1$s tetapi build ini memerlukan API 22 atau lebih baru; perbarui kernel.</string>
     <string name="nomount_unavailable_not_loaded">Driver belum dimuat; mulai ulang atau suntikkan sekali untuk memuatnya.</string>
     <string name="nomount_unavailable_unknown_kmi">Versi kernel tidak dapat dicocokkan dengan modul NoMount.</string>
     <string name="nomount_driver_unavailable">Driver tidak tersedia (%1$s)</string>

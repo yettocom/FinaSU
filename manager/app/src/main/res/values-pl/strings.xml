@@ -38,6 +38,7 @@
     <string name="home_unsupported_reason">KernelSU obsługuje obecnie tylko jądra GKI.</string>
     <string name="home_device_model">Model urządzenia</string>
     <string name="home_kernel">Wersja jądra</string>
+    <string name="home_kernel_full_version">Kompilacja jądra</string>
     <string name="home_manager_version">Wersja menedżera</string>
     <string name="home_fingerprint">Odcisk</string>
     <string name="home_selinux_status">Status SELinux</string>
@@ -280,6 +281,12 @@ Przed kontynuowaniem upewnij się, że bootloader jest odblokowany!</string>
     <string name="settings_selinux_hide_summary">Uniemożliwia aplikacjom wykrycie modyfikacji SELinux</string>
     <string name="settings_selinux_hide_reboot_required">Wymaga ponownego uruchomienia</string>
     <string name="settings_selinux_hide_failed">Błąd: %d</string>
+
+    <string name="settings_mount_view_filter">Ukryj wpisy montowania</string>
+    <string name="settings_mount_view_filter_summary">Usuń wpisy montowania roota i modułów z widoków /proc aplikacji i procesów izolowanych</string>
+    <string name="settings_mount_view_filter_unavailable">Filtrowanie widoku montowania nie jest dostępne w tym jądrze</string>
+    <string name="settings_mount_view_filter_failed">Nie udało się włączyć filtrowania widoku montowania</string>
+    <string name="settings_mount_view_filter_save_failed">Filtrowanie widoku montowania zmieniono, ale nie udało się zapisać go na następne uruchomienie</string>
     <string name="settings_selinux_mode">Tryb SELinux</string>
     <string name="settings_selinux_mode_enforcing">Enforcing</string>
     <string name="settings_selinux_mode_permissive">Dozwolony</string>
@@ -327,7 +334,7 @@ Przed kontynuowaniem upewnij się, że bootloader jest odblokowany!</string>
     <string name="nomount_driver_kind_builtin">wbudowany w jądro</string>
     <string name="nomount_driver_kind_module">moduł jądra</string>
     <string name="nomount_unavailable_no_asset">Ten pakiet nie zawiera modułu NoMount dla %1$s; użyj opcji Automatyczny lub Wbudowany Folk Mount.</string>
-    <string name="nomount_unavailable_outdated">Jądro zawiera NoMount %1$s, ale ta wersja wymaga API 21 lub nowszego; zaktualizuj jądro.</string>
+    <string name="nomount_unavailable_outdated">Jądro zawiera NoMount %1$s, ale ta wersja wymaga API 22 lub nowszego; zaktualizuj jądro.</string>
     <string name="nomount_unavailable_not_loaded">Sterownik nie został jeszcze wczytany; uruchom ponownie lub wykonaj wstrzyknięcie, aby go wczytać.</string>
     <string name="nomount_unavailable_unknown_kmi">Nie udało się dopasować wersji jądra do modułu NoMount.</string>
     <string name="nomount_driver_unavailable">Sterownik niedostępny (%1$s)</string>
