@@ -76,8 +76,8 @@ are missing, and the KDP worker compares `user_ns` as well as `user`.
 
 ## Validation
 
-* `android13-5.15`, `android14-6.1`, `android15-6.6`: build with 0 warnings, all
-  report `KernelSU version: 32997` -> rebuilt at `33023` with the v1.0.9 tree.
+* `android13-5.15`, `android14-6.1`, `android15-6.6`: build with 0 warnings and
+  report `KernelSU version: 33023`, matching the v1.0.9 release APK.
 * Forward apply onto the pristine tag reproduces the patched tree byte for byte;
   each patch passes `git apply -R --check`; reverting both reproduces the tag.
 * No `goto` in added lines; the files keep their upstream indentation and style.
