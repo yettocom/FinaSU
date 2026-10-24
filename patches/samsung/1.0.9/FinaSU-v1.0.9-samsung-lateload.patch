@@ -1,0 +1,370 @@
+diff --git a/userspace/ksud/src/defs.rs b/userspace/ksud/src/defs.rs
+index 0b4d909..74a29c9 100644
+--- a/userspace/ksud/src/defs.rs
++++ b/userspace/ksud/src/defs.rs
+@@ -27,6 +27,10 @@ mod android {
+     /// Held while the dynamic-manager configuration is read and rewritten.
+     pub const DYNAMIC_MANAGER_LOCK_PATH: &str = concatcp!(WORKING_DIR, ".dynamic_manager.lock");
+     pub const DAEMON_PATH: &str = concatcp!(ADB_DIR, "ksud");
++    /// Where the jailbreak kit drops the daemon it wants installed, before the module load.
++    /// `/data/local/tmp` is shell-writable, which is why stage_daemon_from() only accepts a
++    /// root-owned, non-group/world-writable regular file from there.
++    pub const STAGED_DAEMON_PATH: &str = "/data/local/tmp/.ksud-stage";
+     pub const LIBADBROOT_PATH: &str = concatcp!(LIBRARY_DIR, "libadbroot.so");
+ 
+     pub const DAEMON_LINK_PATH: &str = concatcp!(BINARY_DIR, "ksud");
+diff --git a/userspace/ksud/src/late_load.rs b/userspace/ksud/src/late_load.rs
+index cfe299b..25dedf5 100644
+--- a/userspace/ksud/src/late_load.rs
++++ b/userspace/ksud/src/late_load.rs
+@@ -1,7 +1,7 @@
+ use anyhow::{Context, Result};
+ use log::{info, warn};
+ use rustix::cstr;
+-use std::{process::Command, time::Instant};
++use std::time::Instant;
+ 
+ use crate::module::{ScriptWait, handle_updated_modules, prune_modules};
+ use crate::{assets, defs, init_event, magic_mount, mount_guard, restorecon, utils};
+@@ -35,11 +35,23 @@ fn dump_process_info(label: &str) {
+     );
+ }
+ 
+-pub fn run(package_name: &String, kmi: Option<String>, allow_shell: bool) -> Result<()> {
+-    utils::daemonize(false)?;
++pub fn run(_package_name: &String, kmi: Option<String>, allow_shell: bool) -> Result<()> {
+     info!("late-load command triggered!");
+     dump_process_info("late-load start");
+ 
++    // The caller leaves this process in its adbd session and cgroup; a load that outlives the
++    // shell that started it would otherwise take SIGHUP/SIGPIPE with it.  setsid() fails with
++    // EPERM when this process already leads its process group; forking again just to detach is
++    // not worth it here, so the failure is logged and the load goes on.
++    if let Err(e) = rustix::process::setsid() {
++        warn!("setsid failed: {e}");
++    }
++    utils::switch_cgroups();
++
++    // Copy the daemon into place before loading the module changes this process's
++    // security context. The remaining install steps require KernelSU policy.
++    utils::stage_daemon_from(defs::STAGED_DAEMON_PATH).context("Failed to stage ksud")?;
++
+     // 1. Check if KernelSU is already loaded
+     if ksuinit::has_kernelsu() {
+         info!("KernelSU already loaded, skip loading ko");
+@@ -58,11 +70,15 @@ pub fn run(package_name: &String, kmi: Option<String>, allow_shell: bool) -> Res
+ 
+         // 4. Load kernelsu.ko from memory with manual relocation
+         info!("Loading kernelsu.ko for KMI {kmi}...");
+-        // bundled flag is meaningless in jailbreak mode since we can't flash boot to update it.
++        // `bundled=1`: the manager turns KSU_GET_INFO_FLAG_BUNDLED (the kernel's ksu_bundled,
++        // which a late load takes from this module parameter - the image-patch config path is
++        // skipped when late loaded) into its "custom LKM" badge.  This kit loads its own kernel
++        // next to the manager, so report it bundled; upstream leaves the flag off because a
++        // jailbreak load cannot flash boot to update the LKM.
+         let params = if allow_shell {
+-            cstr!("allow_shell=1")
++            cstr!("allow_shell=1 bundled=1")
+         } else {
+-            cstr!("")
++            cstr!("bundled=1")
+         };
+         ksuinit::load_module(&ko_data, params).context("Failed to load kernelsu.ko")?;
+         info!("kernelsu.ko loaded successfully!");
+@@ -79,7 +95,7 @@ pub fn run(package_name: &String, kmi: Option<String>, allow_shell: bool) -> Res
+         warn!("clear temp configs failed: {e}");
+     }
+ 
+-    utils::install(None, None).context("Failed to install ksud")?;
++    utils::finish_install(None, None).context("Failed to finish ksud installation")?;
+ 
+     crate::hot_install::clean_trash();
+ 
+@@ -139,18 +155,5 @@ pub fn run(package_name: &String, kmi: Option<String>, allow_shell: bool) -> Res
+     // injection stopped this device instead.
+     mount_guard::clear_if_ours(std::path::Path::new(defs::MOUNT_INFLIGHT));
+ 
+-    // 14. Restart Manager so it gets a fresh ksu fd from the newly loaded kernel module
+-    info!("Restarting KernelSU Manager {package_name}...");
+-    let _ = Command::new("am")
+-        .args(["force-stop", package_name])
+-        .status();
+-    let _ = Command::new("am")
+-        .args([
+-            "start",
+-            "-n",
+-            &format!("{package_name}/me.weishu.kernelsu.ui.MainActivity"),
+-        ])
+-        .status();
+-
+     Ok(())
+ }
+diff --git a/userspace/ksud/src/utils.rs b/userspace/ksud/src/utils.rs
+index e6a702b..156624b 100644
+--- a/userspace/ksud/src/utils.rs
++++ b/userspace/ksud/src/utils.rs
+@@ -1,12 +1,14 @@
+-use anyhow::{Context, Error, Ok, Result, bail};
+-use rustix::fs::{IFlags, Mode, OFlags, ioctl_getflags, ioctl_setflags, open};
++use anyhow::{Context, Error, Result, bail};
++use log::warn;
++use rustix::fs::{IFlags, Mode, OFlags, chown, ioctl_getflags, ioctl_setflags, open};
+ use rustix::process::setpgid;
+ use rustix::stdio::{dup2_stderr, dup2_stdin, dup2_stdout};
++use rustix::thread::{Gid, Uid};
+ use std::{
+     ffi::{CStr, CString, c_char, c_void},
+     fs::{File, OpenOptions, create_dir_all, remove_file, write},
+     io::{
+-        ErrorKind::{AlreadyExists, NotFound, PermissionDenied},
++        ErrorKind::{AlreadyExists, NotFound},
+         Write,
+     },
+     path::Path,
+@@ -17,6 +19,7 @@ use crate::defs::KSU_TEMP_BACKUP_DIR_NAME;
+ use crate::{assets, boot_patch, defs, ksucalls, module, restorecon};
+ #[allow(unused_imports)]
+ use std::fs::{Permissions, set_permissions};
++use std::os::unix::fs::MetadataExt;
+ use std::os::unix::prelude::PermissionsExt;
+ 
+ use std::path::PathBuf;
+@@ -246,21 +249,203 @@ fn clear_immutable(path: &Path) -> Result<()> {
+     Ok(())
+ }
+ 
+-pub fn install(libadbroot: Option<PathBuf>, data_path: Option<PathBuf>) -> Result<()> {
++/// Put this executable in place as the daemon.
++///
++/// # Errors
++///
++/// Returns an error when the copy or the rename onto [`defs::DAEMON_PATH`] fails.
++pub fn stage_daemon() -> Result<()> {
+     ensure_dir_exists(defs::ADB_DIR)?;
+-    if let Err(e) = std::fs::remove_file(defs::DAEMON_PATH) {
+-        // The daemon may be marked immutable; clear the flag and retry so we
+-        // can overwrite it.
+-        if e.kind() == PermissionDenied && clear_immutable(Path::new(defs::DAEMON_PATH)).is_ok() {
+-            let _ = std::fs::remove_file(defs::DAEMON_PATH);
++    // We should use /proc/self/exe, DO NOT resolve the real path
++    // So that if someone execute /data/adb/ksud install, ksud won't be removed unexpectedly
++    replace_daemon_with(Path::new("/proc/self/exe"))
++}
++
++/// Move a daemon that late-load staged elsewhere into place.
++///
++/// late-load has to install ksud BEFORE it loads kernelsu.ko: loading the module switches this
++/// process into the KernelSU SELinux domain, and the copy into /data/adb/ksud is refused from
++/// there (the destination is left as a zero-byte file).  The kit therefore stages the binary
++/// while it still has the bootstrap context, and this renames it onto the same filesystem.
++///
++/// A caller that stages nothing (DFRoot's bootstrap, Magica) is already running the daemon it
++/// wants installed, so that case falls back to copying /proc/self/exe - still before the module
++/// load, so still from the bootstrap context.
++///
++/// # Errors
++///
++/// Returns an error when the staged file cannot be inspected, or when neither the rename nor the
++/// copy fallback can put a daemon in place.
++pub fn stage_daemon_from(staged_exe: impl AsRef<Path>) -> Result<()> {
++    let staged = staged_exe.as_ref();
++    ensure_dir_exists(defs::ADB_DIR)?;
++
++    // `Ok` and `Err` are anyhow's wrapper functions in this module, so a Result is checked with
++    // if-let and errors are matched through `Error::kind`/`raw_os_error` instead of patterns.
++    if let Err(e) = std::fs::symlink_metadata(staged) {
++        // Nothing was staged: the caller is already running the daemon it wants installed.
++        if e.kind() == NotFound {
++            return stage_daemon();
++        }
++        return Err(e).with_context(|| format!("Failed to stat staged daemon {}", staged.display()));
++    }
++
++    // The staged binary sits in a shell-writable directory, so only take a root-owned regular
++    // file that nobody else can rewrite: rename(2) moves a symlink as a symlink, and the
++    // chown/chmod below follow it.
++    let meta = std::fs::symlink_metadata(staged)
++        .with_context(|| format!("Failed to stat staged daemon {}", staged.display()))?;
++    if !meta.is_file() || meta.uid() != 0 || (meta.mode() & 0o022) != 0 {
++        // Falling back is deliberate: refusing the staged file must not cost the device its
++        // only chance to install a daemon (the caller runs this before the module load).
++        warn!(
++            "Refusing to install {} as the daemon: not a root-owned regular file; using /proc/self/exe",
++            staged.display()
++        );
++        return stage_daemon();
++    }
++
++    land_staged_daemon(staged)?;
++
++    // Re-check what actually landed: the chown/chmod below follow symlinks.  A landing that is
++    // not a regular file is removed and the daemon is installed from /proc/self/exe instead -
++    // bailing here would leave the device without a /data/adb/ksud at all.
++    let meta = std::fs::symlink_metadata(defs::DAEMON_PATH)
++        .with_context(|| format!("Failed to stat {}", defs::DAEMON_PATH))?;
++    if !meta.is_file() {
++        let _ = std::fs::remove_file(defs::DAEMON_PATH);
++        warn!(
++            "{} is not a regular file after the stage, installing /proc/self/exe instead",
++            defs::DAEMON_PATH
++        );
++        return stage_daemon();
++    }
++
++    chown(defs::DAEMON_PATH, Some(Uid::ROOT), Some(Gid::ROOT))
++        .with_context(|| format!("Failed to chown {}", defs::DAEMON_PATH))?;
++    #[cfg(unix)]
++    set_permissions(defs::DAEMON_PATH, Permissions::from_mode(0o755))
++        .with_context(|| format!("Failed to chmod {}", defs::DAEMON_PATH))?;
++
++    Ok(())
++}
++
++/// Path the replacement daemon is written to before it is renamed into place.
++///
++/// It is a sibling of [`defs::DAEMON_PATH`] so the last step is a same-directory rename, and it
++/// is never the path a running daemon was started from.
++fn daemon_temp_path() -> PathBuf {
++    PathBuf::from(format!("{}.new", defs::DAEMON_PATH))
++}
++
++/// Install a copy of `src` as the daemon without ever truncating the current one.
++///
++/// A plain copy onto [`defs::DAEMON_PATH`] opens the destination in place: it fails with
++/// ETXTBSY while that daemon is executing and leaves a half-written file if the copy fails.
++/// Writing a sibling and renaming keeps both the old daemon and the new bytes intact until the
++/// switch, which the filesystem performs atomically.
++fn replace_daemon_with(src: &Path) -> Result<()> {
++    let tmp = daemon_temp_path();
++
++    let _ = std::fs::remove_file(&tmp);
++    std::fs::copy(src, &tmp)
++        .with_context(|| format!("Failed to copy {} to {}", src.display(), tmp.display()))?;
++    commit_daemon_temp(&tmp)
++}
++
++/// Rename the finished copy onto the daemon path, healing an immutable destination once.
++fn commit_daemon_temp(tmp: &Path) -> Result<()> {
++    // EPERM is the immutable inode flag a dynamic manager may set on /data/adb/ksud; EACCES is
++    // a path we may not search and is not something clearing a flag would fix.
++    for attempt in 0..2 {
++        if let Err(e) = std::fs::rename(tmp, defs::DAEMON_PATH) {
++            if e.raw_os_error() == Some(libc::EPERM) && attempt == 0 {
++                clear_immutable(Path::new(defs::DAEMON_PATH)).with_context(|| {
++                    format!("Failed to clear the immutable flag on {}", defs::DAEMON_PATH)
++                })?;
++                continue;
++            }
++            let _ = std::fs::remove_file(tmp);
++            return Err(e).with_context(|| {
++                format!(
++                    "Failed to rename {} to {}",
++                    tmp.display(),
++                    defs::DAEMON_PATH
++                )
++            });
++        }
++        return Ok(());
++    }
++
++    let _ = std::fs::remove_file(tmp);
++    bail!("Failed to rename {} to {}: EPERM persisted", tmp.display(), defs::DAEMON_PATH)
++}
++
++/// Move the staged daemon onto [`defs::DAEMON_PATH`].
++///
++/// rename(2) replaces the destination atomically, so the previous daemon stays in place until
++/// the new one is complete.  An immutable destination refuses the replacement with EPERM (clear
++/// the flag and retry); a kit that staged across filesystems gets EXDEV, which a copy settles.
++fn land_staged_daemon(staged: &Path) -> Result<()> {
++    if let Err(e) = std::fs::rename(staged, defs::DAEMON_PATH) {
++        match e.raw_os_error() {
++            Some(libc::EPERM) => {
++                clear_immutable(Path::new(defs::DAEMON_PATH)).with_context(|| {
++                    format!("Failed to clear the immutable flag on {}", defs::DAEMON_PATH)
++                })?;
++                match std::fs::rename(staged, defs::DAEMON_PATH) {
++                    Ok(()) => {}
++                    Err(e) if e.raw_os_error() == Some(libc::EXDEV) => {
++                        replace_daemon_with(staged)?;
++                        remove_staged(staged);
++                    }
++                    Err(e) => {
++                        return Err(e).with_context(|| {
++                            format!(
++                                "Failed to rename {} to {}",
++                                staged.display(),
++                                defs::DAEMON_PATH
++                            )
++                        });
++                    }
++                }
++            }
++            Some(libc::EXDEV) => {
++                // The kit staged across filesystems: copy to a sibling of the destination and
++                // rename, so the existing daemon is replaced atomically and never truncated.
++                replace_daemon_with(staged)?;
++                remove_staged(staged);
++            }
++            _ => {
++                return Err(e).with_context(|| {
++                    format!(
++                        "Failed to rename {} to {}",
++                        staged.display(),
++                        defs::DAEMON_PATH
++                    )
++                });
++            }
+         }
+     }
+-    std::fs::copy(
+-        // We should use /proc/self/exe, DO NOT resolve the real path
+-        // So that if someone execute /data/adb/ksud install, ksud won't be removed unexpectedly
+-        "/proc/self/exe",
+-        defs::DAEMON_PATH,
+-    )?;
++
++    Ok(())
++}
++
++/// Drop the staged copy once the daemon landed from it.
++///
++/// The daemon is already in place at this point, so a stale copy in the shell-writable staging
++/// directory is the lesser evil: failing here would abort late-load after the install.
++fn remove_staged(staged: &Path) {
++    if let Err(e) = std::fs::remove_file(staged) {
++        warn!(
++            "Failed to remove the staged daemon {}: {e}",
++            staged.display()
++        );
++    }
++}
++
++/// Everything install does once the daemon binary is already in place.
++pub fn finish_install(libadbroot: Option<PathBuf>, data_path: Option<PathBuf>) -> Result<()> {
+     restorecon::lsetfilecon(defs::DAEMON_PATH, restorecon::KSU_CON)?;
+     // install binary assets
+     assets::ensure_binaries(false).with_context(|| "Failed to extract assets")?;
+@@ -298,6 +483,11 @@ pub fn install(libadbroot: Option<PathBuf>, data_path: Option<PathBuf>) -> Resul
+     Ok(())
+ }
+ 
++pub fn install(libadbroot: Option<PathBuf>, data_path: Option<PathBuf>) -> Result<()> {
++    stage_daemon()?;
++    finish_install(libadbroot, data_path)
++}
++
+ pub fn uninstall(package_name: &str) -> Result<()> {
+     if Path::new(defs::MODULE_DIR).exists() {
+         println!("- Uninstall modules..");
+@@ -342,10 +532,6 @@ pub fn daemonize_with<F: FnOnce() -> Result<()>>(use_init_pgrp: bool, configure:
+     Ok(())
+ }
+ 
+-pub fn daemonize(use_init_pgrp: bool) -> Result<()> {
+-    daemonize_with(use_init_pgrp, || Ok(()))
+-}
+-
+ pub fn create_daemon(use_init_pgrp: bool) -> Result<bool> {
+     create_daemon_with(use_init_pgrp, || Ok(()))
+ }
