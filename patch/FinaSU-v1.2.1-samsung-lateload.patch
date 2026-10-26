@@ -14,7 +14,7 @@ index 54e5d3d..21180e0 100644
  
      pub const DAEMON_LINK_PATH: &str = concatcp!(BINARY_DIR, "ksud");
 diff --git a/userspace/ksud/src/late_load.rs b/userspace/ksud/src/late_load.rs
-index cfe299b..25dedf5 100644
+index cfe299b..351101a 100644
 --- a/userspace/ksud/src/late_load.rs
 +++ b/userspace/ksud/src/late_load.rs
 @@ -1,7 +1,7 @@
@@ -80,7 +80,18 @@ index cfe299b..25dedf5 100644
  
      crate::hot_install::clean_trash();
  
-@@ -139,18 +155,5 @@ pub fn run(package_name: &String, kmi: Option<String>, allow_shell: bool) -> Res
+@@ -134,23 +150,16 @@ pub fn run(package_name: &String, kmi: Option<String>, allow_shell: bool) -> Res
+     // 13. Execute boot-completed stage scripts (non-blocking)
+     init_event::run_stage("boot-completed", ScriptWait::NoWait);
+ 
++    // Late load runs after post-fs-data, so the pass init_event makes at boot
++    // never happens in this mode: repeat it once the kernel side is up. It is a
++    // no-op unless FinaSU Hide was enabled beforehand.
++    #[cfg(target_os = "android")]
++    crate::boot_hide::boot_apply();
++
+     // The jailbreak path reaches the end of its own boot sequence here, so the
+     // step recorded for it is done: a record that survives has to mean the
      // injection stopped this device instead.
      mount_guard::clear_if_ours(std::path::Path::new(defs::MOUNT_INFLIGHT));
  
