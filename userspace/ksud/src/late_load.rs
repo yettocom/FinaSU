@@ -125,6 +125,15 @@ pub fn run(package_name: &String, kmi: Option<String>, allow_shell: bool) -> Res
         warn!("module mount failed: {e:#}");
     }
 
+    match crate::umount_config::apply() {
+        Ok(report) if report.failed > 0 => warn!(
+            "umount config: {} applied, {} present, {} failed",
+            report.applied, report.existing, report.failed
+        ),
+        Ok(_) => {}
+        Err(e) => warn!("umount config could not be read or applied: {e:#}"),
+    }
+
     // 11. Execute post-mount stage scripts using the same deadline
     init_event::run_stage("post-mount", wait);
 
@@ -137,7 +146,7 @@ pub fn run(package_name: &String, kmi: Option<String>, allow_shell: bool) -> Res
     // The jailbreak path reaches the end of its own boot sequence here, so the
     // step recorded for it is done: a record that survives has to mean the
     // injection stopped this device instead.
-    mount_guard::clear_if_ours(std::path::Path::new(defs::MOUNT_INFLIGHT));
+    mount_guard::clear_if_ours(std::path::Path::new(defs::MOUNT_INFLIGHT))?;
 
     // 14. Restart Manager so it gets a fresh ksu fd from the newly loaded kernel module
     info!("Restarting KernelSU Manager {package_name}...");

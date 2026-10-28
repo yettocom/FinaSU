@@ -165,6 +165,15 @@ pub fn on_post_fs_data() -> Result<()> {
         warn!("module mount failed: {e:#}");
     }
 
+    match crate::umount_config::apply() {
+        Ok(report) if report.failed > 0 => warn!(
+            "umount config: {} applied, {} present, {} failed",
+            report.applied, report.existing, report.failed
+        ),
+        Ok(_) => {}
+        Err(e) => warn!("umount config could not be read or applied: {e:#}"),
+    }
+
     crate::susfs::boot("post-mount");
     run_stage("post-mount", wait);
 
@@ -259,7 +268,9 @@ pub fn on_boot_completed() {
     // The boot reached a usable state, so the step recorded for it finished:
     // dropping that record is what tells the next boot which provider may run
     // again (a record from an earlier boot has to stay, see `mount_guard`).
-    mount_guard::clear_if_ours(std::path::Path::new(defs::MOUNT_INFLIGHT));
+    if let Err(error) = mount_guard::clear_if_ours(std::path::Path::new(defs::MOUNT_INFLIGHT)) {
+        warn!("could not clear the completed mount guard: {error:#}");
+    }
     // A post-fs-data migration may have had nothing to adopt yet (the package
     // scan had not produced anything); by now it certainly has.
     if let Err(e) = crate::dynamic_manager::finish_migration() {

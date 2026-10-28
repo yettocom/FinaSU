@@ -616,6 +616,18 @@ fun FunctionCategoryContent(uiState: SettingsUiState, actions: SettingsScreenAct
                     )
                 },
                 {
+                    SegmentedListItem(
+                        headlineContent = {
+                            Text(stringResource(R.string.umount_paths_title))
+                        },
+                        supportingContent = {
+                            Text(stringResource(R.string.umount_paths_summary))
+                        },
+                        leadingContent = { Icon(Icons.Filled.LayersClear, null) },
+                        onClick = actions.onOpenUmountPaths,
+                    )
+                },
+                {
                     SegmentedSwitchItem(
                         icon = Icons.Filled.PhonelinkLock,
                         title = stringResource(id = R.string.settings_finasu_hide),
@@ -758,8 +770,13 @@ fun FunctionCategoryContent(uiState: SettingsUiState, actions: SettingsScreenAct
                                 mode == FolkMountMode.BUILTIN && folkMountStatus.metamoduleEnabled ->
                                     stringResource(id = R.string.settings_folk_mount_metamodule_compat_hint)
 
-                                mode == FolkMountMode.NOMOUNT && uiState.nomountStatus?.apiOk == false ->
-                                    stringResource(id = R.string.settings_folk_mount_nomount_unavailable_hint)
+                                mode == FolkMountMode.NOMOUNT &&
+                                    folkMountStatus.bootProvider != null &&
+                                    folkMountStatus.bootProvider != FolkMountProvider.NOMOUNT ->
+                                    folkMountStatus.bootWarning
+                                        ?: stringResource(
+                                            id = R.string.settings_folk_mount_nomount_unavailable_hint
+                                        )
 
                                 else -> null
                             }
