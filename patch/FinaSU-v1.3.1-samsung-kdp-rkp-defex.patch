@@ -1,9 +1,10 @@
 diff --git a/kernel/Kbuild b/kernel/Kbuild
-index ad0003d0..01109b7d 100644
+index 06538430..9eba0e52 100644
 --- a/kernel/Kbuild
 +++ b/kernel/Kbuild
-@@ -1,5 +1,10 @@
- kernelsu-objs := core/init.o
+@@ -6,6 +6,11 @@ $(error Built-in KernelSU requires CONFIG_KALLSYMS_ALL=y for runtime data symbol
+ endif
+ endif
  
 +# Samsung KDP/RKP/DEFEX support lives in kernel/compat/.
 +kernelsu-objs += compat/samsung_kdp.o
@@ -1514,7 +1515,7 @@ index a3bdb0bc..385f47b1 100644
              pr_err("netisolate: restore failed table=%s nr=%d result=%d\n",
                     hook->table == ksu_syscall_table ? "native" : "compat", hook->nr, err);
 diff --git a/kernel/feature/selinux_hide.c b/kernel/feature/selinux_hide.c
-index f33f33f5..5241074e 100644
+index 761c5ea0..6e409eb9 100644
 --- a/kernel/feature/selinux_hide.c
 +++ b/kernel/feature/selinux_hide.c
 @@ -31,6 +31,7 @@
