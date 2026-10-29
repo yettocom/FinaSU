@@ -340,3 +340,40 @@ boot-hide 接线而 +584 B（17,197 B / 3 文件 +238 −39）：
 
 已知边界不变（RKP 16 槽、KDP fail-closed、非 arm64 落桩）。boot-hide 只影响运行期属性读取，
 TEE/Keymaster 类强完整性检查不读属性，改不了。
+
+## 第二十四轮：基线同步到 v1.3.0（2026-10-29）
+
+上游 v1.3.0 = tag `v1.3.0`（commit `9a57ccb0500344de7ee6fc53168b441ee860ade6`，
+`manager: Guide NoMount VFS setup`，版本 33082），新增 per-UID unmount mountpoints
+（`KSU_IOCTL_GET_TRY_UMOUNT`，cmd 33，256 条 × 264 B 条目）、NoMount 数据面校验与恢复、
+SUSFS 状态上报、root shell 解析、Manager 主题、Sui 诊断。
+
+**内核侧漂移为零**：v1.2.1→v1.3.0 只改了 `kernel/feature/kernel_umount.c`、
+`kernel/include/uapi/supercall.h`、`kernel/supercall/dispatch.c`，都不在我们补丁的 20 个文件里，
+所以内核补丁仍可逐字节应用（`patch -p1 --dry-run` 20/20 check OK）。新 ioctl 不需要白名单：
+`syscall_hook.c` 是对 `ksu_syscall_table` 槽位做通用 hook，不按命令号门控。
+
+内核补丁本轮唯一的代码改动是给 `ksu_sys_read` / `ksu_sys_fstat` 补 `noinline`
+（`static long __nocfi noinline ...`，`kernel/runtime/ksud_integration.c`）：它们被
+`ksu_syscall_table_hook(__NR_read, ksu_sys_read, &orig_sys_read)` 按地址安装，和 delta 里
+其它 `__nocfi` 包装器必须一致，否则编译器可能把函数内联掉、把地址指到别处。这两个函数体
+本来就是补丁新增行，所以文件仍 20 个 / +1,807 −105，只是字节数 100,641 → 100,699。
+
+用户态那份只有 1 个 hunk 需要重锚（`late_load.rs` hunk #5）：上游新增了
+`umount_config::apply()` 步骤，并把 `mount_guard::clear_if_ours(...)` 改成可失败
+（`...?`），我们 hunk 的尾部上下文行因此失配。重贴后顺序是
+`umount_config::apply()` → step 11/12/13 → `boot_apply()` → `clear_if_ours(...)?` →
+`Ok(())`，所以上游新引入的失败早退不会跳过 boot-hide 重放。补丁 17,197 → 17,204 B
+（3 文件 / +238 −39 / 11 个 hunk）；新旧补丁的差异只有 3 处 `index` 行和这条上下文行。
+
+版本串：`_src130` 是从 `_upstream105` 本地克隆的真 git 历史（`git rev-list --count` = 3082），
+分支 `Vergissmeinnicht`，HEAD 停在 tag 上，所以 `KSU_VERSION` 自算 33082、
+`KSU_VERSION_FULL` = `v1.3.0-9a57ccb0@Vergissmeinnicht`，**不再需要 marker 填充提交或
+make 变量覆盖**。三个 ko 已实测含该完整串。
+
+验证：`_verify130.sh` 正向 == 工作树、反向 == `_pristine130`，两侧逐字节（排除两个 uapi 目录）；
+`-R --check` 两份都过；新增行 `goto` 0 处；三 KMI 编译 `warnings=0`，`vermagic` 与目标固件串
+逐字符一致。构建见上表（本轮 ko 尺寸比 v1.2.1 各 +1.9~7.8 KB，对应新增的 umount-config 代码）。
+
+已知边界不变（RKP 16 槽、KDP fail-closed、非 arm64 落桩）。DFRoot 专版内嵌的裁剪 ksud
+仍只带 5.15 + 6.6 四个资产（6.1 上 DFRoot 升权不可用），独立 `ksud` 带全部六个。

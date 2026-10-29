@@ -1,5 +1,5 @@
 diff --git a/kernel/Kbuild b/kernel/Kbuild
-index ad0003d..01109b7 100644
+index ad0003d0..01109b7d 100644
 --- a/kernel/Kbuild
 +++ b/kernel/Kbuild
 @@ -1,5 +1,10 @@
@@ -15,7 +15,7 @@ index ad0003d..01109b7 100644
  kernelsu-objs += feature/netisolate.o
 diff --git a/kernel/compat/samsung_defex.c b/kernel/compat/samsung_defex.c
 new file mode 100644
-index 0000000..efcd117
+index 00000000..efcd117c
 --- /dev/null
 +++ b/kernel/compat/samsung_defex.c
 @@ -0,0 +1,264 @@
@@ -285,7 +285,7 @@ index 0000000..efcd117
 +}
 diff --git a/kernel/compat/samsung_defex.h b/kernel/compat/samsung_defex.h
 new file mode 100644
-index 0000000..410805e
+index 00000000..410805e9
 --- /dev/null
 +++ b/kernel/compat/samsung_defex.h
 @@ -0,0 +1,8 @@
@@ -299,7 +299,7 @@ index 0000000..410805e
 +#endif
 diff --git a/kernel/compat/samsung_kdp.c b/kernel/compat/samsung_kdp.c
 new file mode 100644
-index 0000000..d197a7d
+index 00000000..d197a7d8
 --- /dev/null
 +++ b/kernel/compat/samsung_kdp.c
 @@ -0,0 +1,355 @@
@@ -660,7 +660,7 @@ index 0000000..d197a7d
 +}
 diff --git a/kernel/compat/samsung_rkp.c b/kernel/compat/samsung_rkp.c
 new file mode 100644
-index 0000000..68d8d1b
+index 00000000..68d8d1b3
 --- /dev/null
 +++ b/kernel/compat/samsung_rkp.c
 @@ -0,0 +1,631 @@
@@ -1296,7 +1296,7 @@ index 0000000..68d8d1b
 +
 +#endif /* __aarch64__ */
 diff --git a/kernel/core/init.c b/kernel/core/init.c
-index ee0ce66..05425f4 100644
+index ee0ce665..05425f49 100644
 --- a/kernel/core/init.c
 +++ b/kernel/core/init.c
 @@ -12,6 +12,8 @@
@@ -1382,7 +1382,7 @@ index ee0ce66..05425f4 100644
  
  #if NEED_OWN_STACKPROTECTOR
 diff --git a/kernel/feature/mount_view_filter.c b/kernel/feature/mount_view_filter.c
-index d0ab836..8983fcb 100644
+index d0ab836e..8983fcb3 100644
 --- a/kernel/feature/mount_view_filter.c
 +++ b/kernel/feature/mount_view_filter.c
 @@ -19,6 +19,7 @@
@@ -1435,7 +1435,7 @@ index d0ab836..8983fcb 100644
              hook->patched = false;
              continue;
 diff --git a/kernel/feature/netisolate.c b/kernel/feature/netisolate.c
-index a3bdb0b..385f47b 100644
+index a3bdb0bc..385f47b1 100644
 --- a/kernel/feature/netisolate.c
 +++ b/kernel/feature/netisolate.c
 @@ -55,6 +55,8 @@ struct ni_hook {
@@ -1514,7 +1514,7 @@ index a3bdb0b..385f47b 100644
              pr_err("netisolate: restore failed table=%s nr=%d result=%d\n",
                     hook->table == ksu_syscall_table ? "native" : "compat", hook->nr, err);
 diff --git a/kernel/feature/selinux_hide.c b/kernel/feature/selinux_hide.c
-index f33f33f..5241074 100644
+index f33f33f5..5241074e 100644
 --- a/kernel/feature/selinux_hide.c
 +++ b/kernel/feature/selinux_hide.c
 @@ -31,6 +31,7 @@
@@ -1949,7 +1949,7 @@ index f33f33f..5241074 100644
      ksu_unregister_feature_handler(KSU_FEATURE_SELINUX_HIDE);
      mutex_lock(&selinux_state.status_lock);
 diff --git a/kernel/hook/arm64/patch_memory.c b/kernel/hook/arm64/patch_memory.c
-index c344bd5..8bc69f0 100644
+index c344bd55..8bc69f09 100644
 --- a/kernel/hook/arm64/patch_memory.c
 +++ b/kernel/hook/arm64/patch_memory.c
 @@ -6,6 +6,7 @@
@@ -2007,7 +2007,7 @@ index c344bd5..8bc69f0 100644
   * Scan the memory region [start, start+size) for a BL instruction whose
   * branch target equals `target`.  Returns the address of the first matching
 diff --git a/kernel/hook/arm64/syscall_hook.c b/kernel/hook/arm64/syscall_hook.c
-index 7b4c29f..f13bfb6 100644
+index 7b4c29ff..f13bfb6e 100644
 --- a/kernel/hook/arm64/syscall_hook.c
 +++ b/kernel/hook/arm64/syscall_hook.c
 @@ -6,6 +6,7 @@
@@ -2131,7 +2131,7 @@ index 7b4c29f..f13bfb6 100644
  }
  
 diff --git a/kernel/hook/lsm_hook.c b/kernel/hook/lsm_hook.c
-index 4598c6b..f04ed12 100644
+index 4598c6bc..f04ed121 100644
 --- a/kernel/hook/lsm_hook.c
 +++ b/kernel/hook/lsm_hook.c
 @@ -61,12 +61,18 @@ static void ksu_lsm_hook_untrack(struct ksu_lsm_hook *hook)
@@ -2217,7 +2217,7 @@ index 4598c6b..f04ed12 100644
      ksu_lsm_hook_untrack(hook);
      hook->entry = NULL;
 diff --git a/kernel/hook/lsm_hook.h b/kernel/hook/lsm_hook.h
-index 7389578..b2980f9 100644
+index 73895787..b2980f94 100644
 --- a/kernel/hook/lsm_hook.h
 +++ b/kernel/hook/lsm_hook.h
 @@ -18,6 +18,13 @@ struct ksu_lsm_hook {
@@ -2247,7 +2247,7 @@ index 7389578..b2980f9 100644
  
  // Restore the LSM hook entry previously patched by ksu_lsm_hook() back to the
 diff --git a/kernel/hook/patch_memory.h b/kernel/hook/patch_memory.h
-index 0814d5f..3b2cde9 100644
+index 0814d5f5..3b2cde96 100644
 --- a/kernel/hook/patch_memory.h
 +++ b/kernel/hook/patch_memory.h
 @@ -28,6 +28,33 @@
@@ -2285,7 +2285,7 @@ index 0814d5f..3b2cde9 100644
  
  #endif
 diff --git a/kernel/hook/tp_marker.c b/kernel/hook/tp_marker.c
-index c78bbbd..5666403 100644
+index c78bbbdd..5666403a 100644
 --- a/kernel/hook/tp_marker.c
 +++ b/kernel/hook/tp_marker.c
 @@ -7,6 +7,7 @@
@@ -2307,7 +2307,7 @@ index c78bbbd..5666403 100644
  }
 diff --git a/kernel/include/ksu_samsung_kdp.h b/kernel/include/ksu_samsung_kdp.h
 new file mode 100644
-index 0000000..1910d71
+index 00000000..1910d712
 --- /dev/null
 +++ b/kernel/include/ksu_samsung_kdp.h
 @@ -0,0 +1,15 @@
@@ -2328,7 +2328,7 @@ index 0000000..1910d71
 +#endif
 diff --git a/kernel/include/ksu_samsung_rkp.h b/kernel/include/ksu_samsung_rkp.h
 new file mode 100644
-index 0000000..80ef8fa
+index 00000000..80ef8fae
 --- /dev/null
 +++ b/kernel/include/ksu_samsung_rkp.h
 @@ -0,0 +1,58 @@
@@ -2391,7 +2391,7 @@ index 0000000..80ef8fa
 +
 +#endif
 diff --git a/kernel/policy/app_profile.c b/kernel/policy/app_profile.c
-index 10d0326..e420802 100644
+index 10d03262..e4208023 100644
 --- a/kernel/policy/app_profile.c
 +++ b/kernel/policy/app_profile.c
 @@ -18,6 +18,8 @@
@@ -2460,7 +2460,7 @@ index 10d0326..e420802 100644
  
  void __init ksu_app_profile_init(void)
 diff --git a/kernel/runtime/ksud_integration.c b/kernel/runtime/ksud_integration.c
-index a105815..cdd43e8 100644
+index a1058150..70777d24 100644
 --- a/kernel/runtime/ksud_integration.c
 +++ b/kernel/runtime/ksud_integration.c
 @@ -570,8 +570,14 @@ void ksu_execveat_hook_ksud(const struct pt_regs *regs)
@@ -2475,7 +2475,7 @@ index a105815..cdd43e8 100644
 + */
  static long (*orig_sys_read)(const struct pt_regs *regs);
 -static long ksu_sys_read(const struct pt_regs *regs)
-+static long __nocfi ksu_sys_read(const struct pt_regs *regs)
++static long __nocfi noinline ksu_sys_read(const struct pt_regs *regs)
  {
      unsigned int fd = PT_REGS_SYSCALL_PARM1(regs);
      char __user **buf_ptr = (char __user **)&PT_REGS_PARM2(regs);
@@ -2484,12 +2484,12 @@ index a105815..cdd43e8 100644
  
  static long (*orig_sys_fstat)(const struct pt_regs *regs);
 -static long ksu_sys_fstat(const struct pt_regs *regs)
-+static long __nocfi ksu_sys_fstat(const struct pt_regs *regs)
++static long __nocfi noinline ksu_sys_fstat(const struct pt_regs *regs)
  {
      unsigned int fd = PT_REGS_SYSCALL_PARM1(regs);
      void __user *statbuf = (void __user *)PT_REGS_PARM2(regs);
 diff --git a/kernel/selinux/selinux.c b/kernel/selinux/selinux.c
-index 79fcad7..bf6d1d4 100644
+index 79fcad78..bf6d1d4e 100644
 --- a/kernel/selinux/selinux.c
 +++ b/kernel/selinux/selinux.c
 @@ -5,6 +5,7 @@

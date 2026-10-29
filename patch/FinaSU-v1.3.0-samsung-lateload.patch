@@ -1,5 +1,5 @@
 diff --git a/userspace/ksud/src/defs.rs b/userspace/ksud/src/defs.rs
-index 54e5d3d..21180e0 100644
+index e357356a..06066e3b 100644
 --- a/userspace/ksud/src/defs.rs
 +++ b/userspace/ksud/src/defs.rs
 @@ -27,6 +27,10 @@ mod android {
@@ -14,7 +14,7 @@ index 54e5d3d..21180e0 100644
  
      pub const DAEMON_LINK_PATH: &str = concatcp!(BINARY_DIR, "ksud");
 diff --git a/userspace/ksud/src/late_load.rs b/userspace/ksud/src/late_load.rs
-index cfe299b..351101a 100644
+index ae64fc4f..9b91ec92 100644
 --- a/userspace/ksud/src/late_load.rs
 +++ b/userspace/ksud/src/late_load.rs
 @@ -1,7 +1,7 @@
@@ -80,7 +80,7 @@ index cfe299b..351101a 100644
  
      crate::hot_install::clean_trash();
  
-@@ -134,23 +150,16 @@ pub fn run(package_name: &String, kmi: Option<String>, allow_shell: bool) -> Res
+@@ -143,23 +159,16 @@ pub fn run(package_name: &String, kmi: Option<String>, allow_shell: bool) -> Res
      // 13. Execute boot-completed stage scripts (non-blocking)
      init_event::run_stage("boot-completed", ScriptWait::NoWait);
  
@@ -93,7 +93,7 @@ index cfe299b..351101a 100644
      // The jailbreak path reaches the end of its own boot sequence here, so the
      // step recorded for it is done: a record that survives has to mean the
      // injection stopped this device instead.
-     mount_guard::clear_if_ours(std::path::Path::new(defs::MOUNT_INFLIGHT));
+     mount_guard::clear_if_ours(std::path::Path::new(defs::MOUNT_INFLIGHT))?;
  
 -    // 14. Restart Manager so it gets a fresh ksu fd from the newly loaded kernel module
 -    info!("Restarting KernelSU Manager {package_name}...");
@@ -111,7 +111,7 @@ index cfe299b..351101a 100644
      Ok(())
  }
 diff --git a/userspace/ksud/src/utils.rs b/userspace/ksud/src/utils.rs
-index e6a702b..156624b 100644
+index e6a702b1..156624bd 100644
 --- a/userspace/ksud/src/utils.rs
 +++ b/userspace/ksud/src/utils.rs
 @@ -1,12 +1,14 @@
