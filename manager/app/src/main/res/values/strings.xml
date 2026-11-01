@@ -38,6 +38,11 @@
     <string name="home_metric_storage_swap">Swap</string>
     <string name="home_version">Version</string>
     <string name="home_running_mode">Run mode</string>
+    <string name="home_hook_type">Hook type</string>
+    <string name="home_hook_type_tracepoint">Tracepoint</string>
+    <string name="home_hook_type_susfs_inline">SUSFS Inline</string>
+    <string name="home_hook_type_unknown">Legacy / unknown</string>
+    <string name="home_hook_type_failed">%1$s (abnormal)</string>
     <string name="home_running_status">Running status</string>
     <string name="home_state_on">On</string>
     <string name="home_working_version">Version: %s</string>
@@ -284,6 +289,13 @@
     <string name="settings_sucompat_summary">Allow Root access via /system/bin/su, in new processes</string>
     <string name="settings_kernel_umount">Module unmounting (master switch)</string>
     <string name="settings_kernel_umount_summary">Allow apps to remove module mounts at startup. When off, App Profile and custom mountpoint rules have no effect</string>
+    <string name="settings_kernel_umount_unknown">Unable to confirm feature availability</string>
+    <string name="settings_kernel_umount_values">Current: %1$s · Saved for reboot: %2$s</string>
+    <string name="settings_kernel_umount_on">On</string>
+    <string name="settings_kernel_umount_off">Off</string>
+    <string name="settings_kernel_umount_value_unknown">Unknown or not saved</string>
+    <string name="settings_kernel_umount_write_failed">Could not change module unmounting</string>
+    <string name="settings_kernel_umount_save_failed">Changed, but could not save for reboot</string>
     <string name="umount_paths_title">Custom unmount mountpoints</string>
     <string name="umount_paths_summary">Manage mountpoints that selected apps should not see at startup</string>
     <string name="umount_paths_intro_title">Changes the files the app actually sees</string>
@@ -388,6 +400,9 @@
     <string name="settings_folk_mount_reboot_hint">Takes effect after reboot.</string>
     <string name="settings_folk_mount_metamodule_compat_hint">An enabled metamodule is present; its scripts may not work with the built-in engine.</string>
     <string name="settings_folk_mount_nomount_unavailable_hint">The NoMount driver is not answering; this boot falls back to the built-in engine.</string>
+    <string name="settings_folk_mount_nomount_ui_fallback">The previous boot did not confirm NoMount UI readiness; this boot uses the Built-in engine. This does not prove a NoMount fault.</string>
+    <string name="settings_folk_mount_nomount_ui_unconfirmed">NoMount UI readiness was not confirmed; the next boot will use the Built-in engine.</string>
+    <string name="settings_folk_mount_step_interrupted">A previous mount step did not finish; this boot skipped it to avoid repeating the same failure.</string>
     <string name="settings_folk_mount_write_failed">Failed to change the Folk Mount mode.</string>
     <string name="settings_nomount">NoMount</string>
     <string name="nomount_section_driver">Driver</string>
@@ -509,6 +524,8 @@
     <string name="settings_hide_home_mount_summary">Remove the module mounting row from the home info card.</string>
     <string name="settings_hide_home_kernel_full_version">Hide kernel build</string>
     <string name="settings_hide_home_kernel_full_version_summary">Remove the kernel build row from the home info card.</string>
+    <string name="settings_hide_home_hook_type">Hide hook type</string>
+    <string name="settings_hide_home_hook_type_summary">Remove the hook type row from the home info card.</string>
     <string name="settings_category_general">General</string>
     <string name="settings_category_appearance">Appearance</string>
     <string name="settings_category_behavior">Behavior</string>
@@ -695,6 +712,10 @@
     <string name="settings_finasu_hide_failed">Failed to change FinaSU Hide</string>
     <string name="settings_adb_root" translatable="false">ADB Root</string>
     <string name="settings_adb_root_summary">Run adbd daemon with Root privileges</string>
+    <string name="feature_external_changes_title">Shared settings were changed outside FinaSU</string>
+    <string name="feature_external_changes_summary">An external module or manager changed these runtime values after FinaSU applied its saved settings. FinaSU will not overwrite them automatically.</string>
+    <string name="feature_external_value_on">On</string>
+    <string name="feature_external_value_off">Off</string>
     <string name="menu_sort">Sort</string>
     <string name="sort_by_name">Application name</string>
     <string name="sort_by_package_name">Package name</string>

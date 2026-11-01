@@ -105,6 +105,7 @@ pub fn on_post_fs_data() -> Result<()> {
     } else if let Err(e) = crate::feature::init_features() {
         warn!("init features failed: {e}");
     }
+    crate::feature::capture_baseline();
     crate::uts_view::boot_apply();
     crate::netisolate::boot_apply();
 
@@ -128,6 +129,9 @@ pub fn on_post_fs_data() -> Result<()> {
         Ok(None) => warn!("kernel module autoload is still running in the background"),
         Err(e) => warn!("kernel module autoload scheduler failed: {e:#}"),
     }
+    // A managed LKM can become visible after the first early capture and before
+    // module mounts. Capture only the kstat rules that were not visible earlier.
+    crate::susfs::boot("pre-mount-late");
 
     // execute metamodule post-fs-data script first (priority)
     if let Err(e) = metamodule::exec_stage_script("post-fs-data", wait) {
@@ -150,6 +154,7 @@ pub fn on_post_fs_data() -> Result<()> {
     ) {
         warn!("exec plugin post-fs-data callbacks failed: {e}");
     }
+    crate::feature::detect_external_changes("post-fs-data");
 
     crate::boot_hide::boot_apply();
 
@@ -218,6 +223,7 @@ pub fn run_stage(stage: &str, wait: ScriptWait) {
     if let Err(e) = crate::module::exec_stage_script(stage, wait) {
         warn!("Failed to exec {stage} scripts: {e}");
     }
+    crate::feature::detect_external_changes(stage);
 
     // Later stages do not block the boot, so plugin callbacks are dispatched in
     // the background. The bounded stages above keep their deadline instead.
@@ -250,10 +256,10 @@ pub fn on_services() {
     if let Err(e) = crate::zygisk::services() {
         warn!("FolkZygisk health check failed: {e:#}");
     }
+    run_stage("service", ScriptWait::NoWait);
     if let Err(e) = crate::sui::services() {
         warn!("Sui health check failed: {e:#}");
     }
-    run_stage("service", ScriptWait::NoWait);
 }
 
 pub fn on_boot_completed() {

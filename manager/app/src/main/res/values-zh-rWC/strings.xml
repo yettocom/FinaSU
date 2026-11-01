@@ -29,6 +29,11 @@
     <string name="home_metric_storage_swap">灵力交换</string>
     <string name="home_version">篇次</string>
     <string name="home_running_mode">修炼模式</string>
+    <string name="home_hook_type">钩连之法</string>
+    <string name="home_hook_type_tracepoint">Tracepoint</string>
+    <string name="home_hook_type_susfs_inline">SUSFS Inline</string>
+    <string name="home_hook_type_unknown">旧版 / 未知</string>
+    <string name="home_hook_type_failed">%1$s（异常）</string>
     <string name="home_running_status">修炼状态</string>
     <string name="home_state_on">已启</string>
     <string name="home_working_version">篇次：%s</string>
@@ -274,6 +279,13 @@
     <string name="settings_kernel_umount">道核卸符</string>
     <string name="settings_kernel_umount_summary">于道核层为所需凡器卸除仙符</string>
     <string name="settings_finasu_hide">FinaSU Hide</string>
+    <string name="settings_kernel_umount_unknown">未能勘验功能是否可施矣</string>
+    <string name="settings_kernel_umount_values">今：%1$s · 轮转后：%2$s矣</string>
+    <string name="settings_kernel_umount_on">开启矣</string>
+    <string name="settings_kernel_umount_off">关闭矣</string>
+    <string name="settings_kernel_umount_value_unknown">未知或未留存矣</string>
+    <string name="settings_kernel_umount_write_failed">未能修改卸载模块总开关矣</string>
+    <string name="settings_kernel_umount_save_failed">已修改，但未能留存供轮转后使用矣</string>
     <string name="umount_paths_title">自定卸除挂载之点</string>
     <string name="umount_paths_summary">执掌指定凡器启行时不可见之挂载点</string>
     <string name="umount_paths_intro_title">更易凡器真正所见之文卷</string>
@@ -378,6 +390,9 @@
     <string name="settings_folk_mount_reboot_hint">重铸仙躯后生效。</string>
     <string name="settings_folk_mount_metamodule_compat_hint">存有已启之元仙符；其符箓或与内置法门不谐。</string>
     <string name="settings_folk_mount_nomount_unavailable_hint">NoMount 驱动无应；此番启道退回内置法门。</string>
+    <string name="settings_folk_mount_nomount_ui_fallback">前番启道未验 NoMount 界面已备；此番启道暂归 Built-in 法门。此非 NoMount 故障之证矣。</string>
+    <string name="settings_folk_mount_nomount_ui_unconfirmed">未验 NoMount 界面已备；下番启道当归 Built-in 法门矣。</string>
+    <string name="settings_folk_mount_step_interrupted">前番挂载法仪未竟；此番启道暂越之，以免旧患复临矣。</string>
     <string name="settings_folk_mount_write_failed">易 Folk Mount 模式败陨。</string>
     <string name="settings_nomount">NoMount</string>
     <string name="nomount_section_driver">驱动</string>
@@ -498,6 +513,8 @@
     <string name="settings_hide_home_mount_summary">隐去首页玄录中模块挂载之一行。</string>
     <string name="settings_hide_home_kernel_full_version">隐去道核全篇</string>
     <string name="settings_hide_home_kernel_full_version_summary">隐去首页玄录中道核全篇之一行。</string>
+    <string name="settings_hide_home_hook_type">隐去钩连之法</string>
+    <string name="settings_hide_home_hook_type_summary">隐去首页玄录中钩连之法之一行。</string>
     <string name="settings_category_general">凡尘设置</string>
     <string name="settings_category_appearance">道韵外观</string>
     <string name="settings_category_behavior">功法运转</string>
@@ -665,6 +682,10 @@
     <string name="settings_finasu_hide_failed">易 FinaSU Hide 败陨</string>
     <string name="settings_adb_root" translatable="false">ADB Root</string>
     <string name="settings_adb_root_summary">以 Root 之权运转 adbd 守护之灵</string>
+    <string name="feature_external_changes_title">共享设符已被外部修改矣</string>
+    <string name="feature_external_changes_summary">外部模块或掌道者在 FinaSU 施行已留存设符后修改了这些运行值。FinaSU 不会自行覆盖矣。</string>
+    <string name="feature_external_value_on">开启矣</string>
+    <string name="feature_external_value_off">关闭矣</string>
     <string name="menu_sort">排序</string>
     <string name="sort_by_name">凡器名讳</string>
     <string name="sort_by_package_name">包名</string>

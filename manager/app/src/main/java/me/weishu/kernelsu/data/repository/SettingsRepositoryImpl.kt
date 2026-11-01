@@ -30,6 +30,7 @@ import me.weishu.kernelsu.ksuApp
 import me.weishu.kernelsu.magica.BootCompletedReceiver
 import me.weishu.kernelsu.ui.util.execKsud
 import me.weishu.kernelsu.ui.util.execKsudResult
+import me.weishu.kernelsu.ui.util.getFeatureChanges
 import me.weishu.kernelsu.ui.util.getFeaturePersistValue
 import me.weishu.kernelsu.ui.util.getFeatureValue
 import me.weishu.kernelsu.ui.util.getFeatureStatus
@@ -146,6 +147,10 @@ class SettingsRepositoryImpl : SettingsRepository {
     override var hideHomeKernelFullVersion: Boolean
         get() = prefs.getBoolean("hide_home_kernel_full_version", false)
         set(value) = prefs.edit { putBoolean("hide_home_kernel_full_version", value) }
+
+    override var hideHomeHookType: Boolean
+        get() = prefs.getBoolean("hide_home_hook_type", false)
+        set(value) = prefs.edit { putBoolean("hide_home_hook_type", value) }
 
     override var enablePredictiveBack: Boolean
         get() = prefs.getBoolean("enable_predictive_back", false)
@@ -329,9 +334,13 @@ class SettingsRepositoryImpl : SettingsRepository {
 
     override suspend fun getKernelUmountStatus(): String = getFeatureStatus("kernel_umount")
 
-    override fun isKernelUmountEnabled(): Boolean = Natives.isKernelUmountEnabled()
+    override suspend fun getKernelUmountValue(): Long? = getFeatureValue("kernel_umount")
 
-    override fun setKernelUmountEnabled(enabled: Boolean): Boolean = Natives.setKernelUmountEnabled(enabled)
+    override suspend fun getKernelUmountPersistValue(): Long? = getFeaturePersistValue("kernel_umount")
+    override suspend fun getExternalFeatureChanges() = getFeatureChanges()
+
+    override suspend fun setKernelUmountEnabled(enabled: Boolean): Boolean =
+        execKsudResult("feature set kernel_umount ${if (enabled) 1 else 0}").isSuccess
 
     override suspend fun getSelinuxHideStatus(): String = getFeatureStatus("selinux_hide")
 

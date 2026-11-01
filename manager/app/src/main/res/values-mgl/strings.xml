@@ -29,6 +29,11 @@
     <string name="home_metric_storage_swap">交换空间</string>
     <string name="home_version">版本</string>
     <string name="home_running_mode">运转模式</string>
+    <string name="home_hook_type">魔法契约</string>
+    <string name="home_hook_type_tracepoint">Tracepoint</string>
+    <string name="home_hook_type_susfs_inline">SUSFS Inline</string>
+    <string name="home_hook_type_unknown">旧版 / 未知</string>
+    <string name="home_hook_type_failed">%1$s（异常）</string>
     <string name="home_running_status">运转状态</string>
     <string name="home_state_on">已点亮</string>
     <string name="home_working_version">版本：%s</string>
@@ -274,6 +279,13 @@
     <string name="settings_kernel_umount">解除魔法阵（心之契约级）</string>
     <string name="settings_kernel_umount_summary">由心之契约为需要的应用解除魔法阵</string>
     <string name="settings_finasu_hide">FinaSU Hide</string>
+    <string name="settings_kernel_umount_unknown">无法确认功能是否可用（魔法契约）</string>
+    <string name="settings_kernel_umount_values">此刻：%1$s · 重铸后：%2$s（魔法契约）</string>
+    <string name="settings_kernel_umount_on">开启（魔法契约）</string>
+    <string name="settings_kernel_umount_off">关闭（魔法契约）</string>
+    <string name="settings_kernel_umount_value_unknown">未知或未铭刻</string>
+    <string name="settings_kernel_umount_write_failed">无法修改卸载模块总开关（魔法契约）</string>
+    <string name="settings_kernel_umount_save_failed">已修改，但无法铭刻供重铸后使用</string>
     <string name="umount_paths_title">自定义卸载魔法阵</string>
     <string name="umount_paths_summary">管理指定应用启程时不可见的魔法阵</string>
     <string name="umount_paths_intro_title">改变应用真正看见的魔法文件</string>
@@ -378,6 +390,9 @@
     <string name="settings_folk_mount_reboot_hint">重新觉醒后生效。</string>
     <string name="settings_folk_mount_metamodule_compat_hint">存在已点亮的 metamodule；其咒式可能与内建引擎不兼容。</string>
     <string name="settings_folk_mount_nomount_unavailable_hint">NoMount 驱动没有回应；本次觉醒回退到内建引擎。</string>
+    <string name="settings_folk_mount_nomount_ui_fallback">上次觉醒没确认 NoMount 魔法界面已就绪；本次觉醒先交给 Built-in 法阵。这可不代表 NoMount 出故障。</string>
+    <string name="settings_folk_mount_nomount_ui_unconfirmed">没确认 NoMount 魔法界面已就绪；下次觉醒会先交给 Built-in 法阵。</string>
+    <string name="settings_folk_mount_step_interrupted">上次挂载法阵没走完；本次觉醒跳过它，免得再撞上同一道故障。</string>
     <string name="settings_folk_mount_write_failed">修改 Folk Mount 模式变身失败。</string>
     <string name="settings_nomount">NoMount</string>
     <string name="nomount_section_driver">驱动</string>
@@ -489,6 +504,8 @@
     <string name="settings_hide_home_mount_summary">从首页魔法录中隐去模块挂载一行。</string>
     <string name="settings_hide_home_kernel_full_version">隐匿内核全貌</string>
     <string name="settings_hide_home_kernel_full_version_summary">从首页魔法录中隐去内核全貌一行。</string>
+    <string name="settings_hide_home_hook_type">隐匿魔法契约</string>
+    <string name="settings_hide_home_hook_type_summary">从首页魔法录中隐去魔法契约一行。</string>
     <string name="settings_category_general">通用</string>
     <string name="settings_category_appearance">外观</string>
     <string name="settings_category_behavior">行为</string>
@@ -656,6 +673,10 @@
     <string name="settings_finasu_hide_failed">变更 FinaSU Hide 未成</string>
     <string name="settings_adb_root" translatable="false">ADB Root</string>
     <string name="settings_adb_root_summary">以 Root 权限运行 adbd 守护进程</string>
+    <string name="feature_external_changes_title">共享设定已被外部修改（魔法契约）</string>
+    <string name="feature_external_changes_summary">外部模块或魔法管理者在 FinaSU 施展已铭刻设定后修改了这些运行值。FinaSU 不会自动覆盖。</string>
+    <string name="feature_external_value_on">开启（魔法契约）</string>
+    <string name="feature_external_value_off">关闭（魔法契约）</string>
     <string name="menu_sort">排序</string>
     <string name="sort_by_name">应用名</string>
     <string name="sort_by_package_name">包名</string>

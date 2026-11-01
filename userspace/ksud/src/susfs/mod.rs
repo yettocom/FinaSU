@@ -2,6 +2,7 @@
 #![cfg_attr(not(target_os = "android"), allow(dead_code))]
 mod abi;
 mod apply;
+mod legacy;
 mod model;
 mod store;
 
@@ -39,7 +40,7 @@ pub struct UnameTakeoverSnapshot {
     applied: Option<model::Uname>,
 }
 
-#[derive(Debug, Clone, Copy, clap::Subcommand)]
+#[derive(Debug, Clone, clap::Subcommand)]
 pub enum Command {
     /// Query the root-only control ABI and the FinaSU management state
     Status,
@@ -47,8 +48,18 @@ pub enum Command {
     Export,
     /// Validate and atomically save JSON from stdin; does not apply it
     Import,
+    /// Validate and normalize JSON from stdin without writing it
+    Preview,
     /// Apply supported live operations; never fabricates pre-mount kstat
     Apply,
+    /// Begin an ownership switch; confirmation is required after a reboot
+    Switch { target: String },
+    /// Confirm the pending switch after checking external writers and runtime state
+    ConfirmSwitch,
+    /// Cancel a pending ownership switch
+    CancelSwitch,
+    /// Restore the schema 1 backup after first backing up the current configuration
+    RestoreSchema1,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -59,6 +70,69 @@ pub struct Detection {
     pub implementation: &'static str,
     pub features: Vec<String>,
     pub proc_nodes: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct Capabilities {
+    pub supported: Vec<&'static str>,
+    pub static_kstat_fields: Vec<&'static str>,
+    pub redirect_uid_schemes: Vec<u32>,
+}
+
+fn capabilities(detection: &Detection) -> Capabilities {
+    let kstat = detection.supports("CONFIG_KSU_SUSFS_SUS_KSTAT");
+    let static_supported = abi::static_kstat_profile(detection);
+    let redirect = detection.supports("CONFIG_KSU_SUSFS_OPEN_REDIRECT");
+    let mut supported = Vec::new();
+    for (enabled, name) in [
+        (
+            detection.supports("CONFIG_KSU_SUSFS_SUS_MOUNT"),
+            "hide_mounts",
+        ),
+        (detection.supports("CONFIG_KSU_SUSFS_ENABLE_LOG"), "logging"),
+        (
+            detection.status == "compatible"
+                && if detection.implementation == "lkm" {
+                    detection.proc("susfs_avc_spoof")
+                } else {
+                    true
+                },
+            "avc_spoof",
+        ),
+        (detection.supports("CONFIG_KSU_SUSFS_SPOOF_UNAME"), "uname"),
+        (
+            detection.supports("CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG"),
+            "cmdline",
+        ),
+        (detection.supports("CONFIG_KSU_SUSFS_SUS_PATH"), "path"),
+        (detection.supports("CONFIG_KSU_SUSFS_SUS_MAP"), "map"),
+        (kstat, "dynamic_kstat"),
+        (
+            kstat && (detection.implementation != "lkm" || detection.proc("susfs_kstat")),
+            "full_clone",
+        ),
+        (static_supported, "static_kstat"),
+        (redirect, "redirect"),
+        (detection.proc("susfs_hide_modules"), "hidden_modules"),
+        (detection.proc("susfs_hide_mounts"), "mount_prefixes"),
+    ] {
+        if enabled {
+            supported.push(name);
+        }
+    }
+    Capabilities {
+        supported,
+        static_kstat_fields: abi::static_kstat_fields(static_supported),
+        redirect_uid_schemes: if redirect {
+            if detection.implementation == "lkm" {
+                vec![0, 1, 2, 3, 4]
+            } else {
+                vec![0, 1, 2]
+            }
+        } else {
+            Vec::new()
+        },
+    }
 }
 
 impl Detection {
@@ -174,12 +248,28 @@ pub fn lock_store() -> Result<store::Lock> {
 }
 
 pub fn uname_provider_state() -> Result<UnameProviderState> {
-    if !detect().supports("CONFIG_KSU_SUSFS_SPOOF_UNAME") {
+    let ownership = store::read_ownership()?;
+    let detection = detect();
+    if detection.status == "not_detected" {
+        return Ok(UnameProviderState::default());
+    }
+    if detection.status != "compatible" {
+        return Ok(UnameProviderState {
+            uncertain: true,
+            ..UnameProviderState::default()
+        });
+    }
+    if !detection.supports("CONFIG_KSU_SUSFS_SPOOF_UNAME") {
         return Ok(UnameProviderState::default());
     }
     let config = store::read_config()?;
     let state = store::read_state()?;
-    Ok(uname_provider(&config, &state))
+    let mut provider = uname_provider(&config, &state);
+    if ownership.require_builtin().is_err() {
+        provider.scheduled = false;
+        provider.uncertain = true;
+    }
+    Ok(provider)
 }
 
 fn uname_provider(config: &Config, state: &store::State) -> UnameProviderState {
@@ -201,6 +291,7 @@ fn uname_provider(config: &Config, state: &store::State) -> UnameProviderState {
 }
 
 pub fn uname_takeover_snapshot() -> Result<UnameTakeoverSnapshot> {
+    store::read_ownership()?.require_builtin()?;
     let detection = detect();
     if !detection.supports("CONFIG_KSU_SUSFS_SPOOF_UNAME") {
         bail!("SUSFS uname spoofing is unavailable");
@@ -237,6 +328,7 @@ fn set_uname_runtime(release: &str, version: &str) -> Result<()> {
 }
 
 pub fn take_uname_provider(snapshot: &UnameTakeoverSnapshot) -> Result<()> {
+    store::read_ownership()?.require_builtin()?;
     let mut config = snapshot.config.clone();
     config.settings.uname = None;
     store::write_config(&config).context("Persist SUSFS provider handoff")?;
@@ -251,6 +343,7 @@ pub fn take_uname_provider(snapshot: &UnameTakeoverSnapshot) -> Result<()> {
 }
 
 pub fn restore_uname_provider(snapshot: &UnameTakeoverSnapshot) -> Result<()> {
+    store::read_ownership()?.require_builtin()?;
     let mut residuals = Vec::new();
     if let Err(error) = store::write_config(&snapshot.config) {
         residuals.push(format!("config:{error:#}"));
@@ -305,7 +398,37 @@ fn uts_arbitration_active(config: &Config, query: impl FnOnce() -> Result<bool>)
 }
 
 fn status_summary(config: &Config, uts_active: bool) -> Result<&'static str> {
-    store::summary_with_deferred(config, uname_conflicts(config, uts_active))
+    let summary = store::summary_with_deferred(config, uname_conflicts(config, uts_active))?;
+    Ok(if summary == "applied" && !config.rules.is_empty() {
+        "acknowledged_unknown"
+    } else {
+        summary
+    })
+}
+
+fn status_receipt(status: &str) -> Result<serde_json::Value> {
+    let state = store::read_state()?;
+    let mut failures = state.failures.clone();
+    for key in state.uncertain.keys() {
+        failures.insert(
+            key.clone(),
+            "Previous operation result is unknown; reboot and verify the provider before retrying"
+                .to_owned(),
+        );
+    }
+    let skipped: std::collections::BTreeMap<_, _> = state
+        .skipped
+        .iter()
+        .map(|(key, value)| (key.clone(), value.reason.clone()))
+        .collect();
+    Ok(serde_json::json!({
+        "status": status,
+        "applied": state.applied.keys().collect::<Vec<_>>(),
+        "failures": failures,
+        "skipped": skipped,
+        "deferred": Vec::<String>::new(),
+        "pending_reboot": state.pending_reboot,
+    }))
 }
 
 fn apply_with_uts_arbitration(
@@ -336,17 +459,36 @@ pub fn run(command: Command) -> Result<()> {
     match command {
         Command::Status => {
             let detection = detect();
-            let uname_provider = uname_provider_state().unwrap_or_default();
+            let capabilities = capabilities(&detection);
+            let ownership = store::read_ownership();
+            let uname_provider = uname_provider_state().unwrap_or_else(|_| UnameProviderState {
+                uncertain: true,
+                ..UnameProviderState::default()
+            });
             let config = store::read_config().and_then(|config| {
-                let uts_active =
-                    uts_arbitration_active(&config, uts_provider_active).unwrap_or(false);
-                let summary = status_summary(&config, uts_active)?;
-                Ok((config, summary))
+                let ownership = store::read_ownership()?;
+                let boot_id = std::fs::read_to_string("/proc/sys/kernel/random/boot_id")?;
+                let switch_ready = ownership
+                    .pending
+                    .as_ref()
+                    .is_some_and(|p| p.may_confirm(boot_id.trim()));
+                let summary = match uts_arbitration_active(&config, uts_provider_active) {
+                    Ok(uts_active) => status_summary(&config, uts_active)?,
+                    Err(_) => "unknown",
+                };
+                let receipt = status_receipt(summary)?;
+                Ok((config, summary, ownership, switch_ready, receipt))
             });
             let status = match config {
-                Ok((config, summary)) => serde_json::json!({
+                Ok((config, summary, ownership, switch_ready, receipt)) => serde_json::json!({
                     "detection": detection, "automatic": config.automatic,
+                    "ownership": ownership,
+                    "switch_ready": switch_ready,
+                    "capabilities": capabilities,
+                    "static_kstat_supported": capabilities.supported.contains(&"static_kstat"),
                     "management": summary, "config_error": null,
+                    "receipt": receipt,
+                    "schema1_backup_available": store::schema1_backup_available(),
                     "uname_applied": uname_provider.applied,
                     "uname_scheduled": uname_provider.scheduled,
                     "uname_uncertain": uname_provider.uncertain,
@@ -354,6 +496,10 @@ pub fn run(command: Command) -> Result<()> {
                 Err(error) => serde_json::json!({
                     "detection": detection, "automatic": false, "management": "failed",
                     "config_error": error.to_string(),
+                    "ownership": ownership.ok(),
+                    "capabilities": capabilities,
+                    "static_kstat_supported": capabilities.supported.contains(&"static_kstat"),
+                    "schema1_backup_available": store::schema1_backup_available(),
                     "uname_applied": uname_provider.applied,
                     "uname_scheduled": uname_provider.scheduled,
                     "uname_uncertain": uname_provider.uncertain,
@@ -367,12 +513,36 @@ pub fn run(command: Command) -> Result<()> {
             std::io::stdin()
                 .take((model::MAX_CONFIG + 1) as u64)
                 .read_to_string(&mut input)?;
-            let config = Config::parse(&input)?;
+            let (config, migration) = Config::parse_with_migration(&input)?;
             let _lock = store::lock()?;
+            store::read_ownership()?.require_builtin()?;
+            if migration.is_some() {
+                store::backup_source(&input).context("Back up imported source configuration")?;
+            }
             store::write_config(&config)?;
             println!(
                 "{}",
-                serde_json::json!({"status": "saved", "management": store::summary(&config)?})
+                serde_json::json!({
+                    "status": "saved",
+                    "management": store::summary(&config)?,
+                    "migrated": migration.is_some(),
+                    "warnings": migration.map(|value| value.warnings).unwrap_or_default(),
+                })
+            );
+        }
+        Command::Preview => {
+            let mut input = String::new();
+            std::io::stdin()
+                .take((model::MAX_CONFIG + 1) as u64)
+                .read_to_string(&mut input)?;
+            let (config, migration) = Config::parse_with_migration(&input)?;
+            println!(
+                "{}",
+                serde_json::json!({
+                    "config": config,
+                    "migrated": migration.is_some(),
+                    "warnings": migration.map(|value| value.warnings).unwrap_or_default(),
+                })
             );
         }
         Command::Apply => {
@@ -380,19 +550,61 @@ pub fn run(command: Command) -> Result<()> {
             // provider. Holding it here serializes arbitration without making
             // unrelated SUSFS operations depend on UTS config storage.
             let _lock = store::lock()?;
+            store::read_ownership()?.require_builtin()?;
             let config = store::read_config()?;
             let uts_active = uts_arbitration_active(&config, uts_provider_active)?;
             let result =
                 apply_with_uts_arbitration(&config, &detect(), apply::Stage::Live, uts_active)?;
             println!("{}", serde_json::to_string(&result)?);
         }
+        Command::Switch { target } => {
+            let target = match target.as_str() {
+                "builtin" => model::ManagementMode::Builtin,
+                "external" => model::ManagementMode::External,
+                _ => bail!("Expected builtin or external"),
+            };
+            let _lock = store::lock()?;
+            let mut ownership = store::read_ownership()?;
+            let boot_id = std::fs::read_to_string("/proc/sys/kernel/random/boot_id")?
+                .trim()
+                .to_owned();
+            ownership.begin(target, &boot_id)?;
+            store::backup_for_switch().context("Back up SUSFS configuration before switching")?;
+            store::write_ownership(&ownership)?;
+            println!("{}", serde_json::to_string(&ownership)?);
+        }
+        Command::ConfirmSwitch => {
+            let _lock = store::lock()?;
+            let mut ownership = store::read_ownership()?;
+            let boot_id = std::fs::read_to_string("/proc/sys/kernel/random/boot_id")?;
+            ownership.confirm(boot_id.trim())?;
+            store::write_ownership(&ownership)?;
+            println!("{}", serde_json::to_string(&ownership)?);
+        }
+        Command::CancelSwitch => {
+            let _lock = store::lock()?;
+            let mut ownership = store::read_ownership()?;
+            ownership.cancel()?;
+            store::write_ownership(&ownership)?;
+            println!("{}", serde_json::to_string(&ownership)?);
+        }
+        Command::RestoreSchema1 => {
+            let _lock = store::lock()?;
+            store::read_ownership()?.require_builtin()?;
+            let config = store::restore_schema1_backup()?;
+            println!(
+                "{}",
+                serde_json::json!({"status": "saved", "management": store::summary(&config)?})
+            );
+        }
     }
     Ok(())
 }
 
 pub fn boot(stage: &str) {
-    let stage = match stage {
+    let phase = match stage {
         "pre-mount" => apply::Stage::PreMount,
+        "pre-mount-late" => apply::Stage::LatePreMount,
         "post-mount" => apply::Stage::PostMount,
         "service" | "boot-completed" => apply::Stage::Deferred,
         _ => return,
@@ -401,21 +613,26 @@ pub fn boot(stage: &str) {
         // Keep the shared provider state stable for this transaction. UTS
         // commits take the same lock, so a separate UTS config lock would only
         // duplicate serialization and couple SUSFS to UTS file permissions.
-        let _lock = store::lock()?;
-        let config = store::read_config()?;
+        let _lock = store::lock().context("Lock SUSFS state")?;
+        let config = store::read_config().context("Read SUSFS configuration")?;
+        if store::read_ownership()?.require_builtin().is_err() {
+            return Ok(());
+        }
         if !config.automatic || safe_mode() {
             return Ok(());
         }
-        let uts_active = uts_arbitration_active(&config, uts_provider_active)?;
-        let report = apply_with_uts_arbitration(&config, &detect(), stage, uts_active)?;
-        log::info!("SUSFS: {}", serde_json::to_string(&report)?);
+        let uts_active =
+            uts_arbitration_active(&config, uts_provider_active).context("Check UTS provider")?;
+        let report = apply_with_uts_arbitration(&config, &detect(), phase, uts_active)
+            .context("Apply SUSFS operations")?;
+        log::info!("SUSFS {stage}: {}", serde_json::to_string(&report)?);
         Ok(())
     })();
     if let Err(error) = result {
-        log::warn!("SUSFS boot apply: {error:#}");
+        log::warn!("SUSFS {stage} apply: {error:#}");
     }
     #[cfg(target_os = "android")]
-    if stage == apply::Stage::Deferred {
+    if phase == apply::Stage::Deferred {
         crate::uts_view::resume_after_susfs();
     }
 }
@@ -481,6 +698,48 @@ mod tests {
     }
 
     #[test]
+    fn capability_profile_tracks_provider_controls() {
+        let builtin = Detection {
+            status: "compatible",
+            version: "v2.3.0".to_owned(),
+            variant: "GKI".to_owned(),
+            implementation: "builtin",
+            features: vec![
+                "CONFIG_KSU_SUSFS_SUS_PATH".to_owned(),
+                "CONFIG_KSU_SUSFS_SUS_KSTAT".to_owned(),
+                "CONFIG_KSU_SUSFS_OPEN_REDIRECT".to_owned(),
+            ],
+            proc_nodes: Vec::new(),
+        };
+        let builtin_capabilities = capabilities(&builtin);
+        assert!(builtin_capabilities.supported.contains(&"path"));
+        assert!(builtin_capabilities.supported.contains(&"dynamic_kstat"));
+        assert!(builtin_capabilities.supported.contains(&"full_clone"));
+        assert!(builtin_capabilities.supported.contains(&"avc_spoof"));
+        assert_eq!(builtin_capabilities.redirect_uid_schemes, [0, 1, 2]);
+        assert!(!builtin_capabilities.supported.contains(&"hidden_modules"));
+        assert!(builtin_capabilities.supported.contains(&"static_kstat"));
+        assert_eq!(builtin_capabilities.static_kstat_fields.len(), 12);
+
+        let lkm = Detection {
+            implementation: "lkm",
+            features: vec![
+                "SUSFS_LKM_MODULES".to_owned(),
+                "CONFIG_KSU_SUSFS_SUS_KSTAT".to_owned(),
+                "CONFIG_KSU_SUSFS_OPEN_REDIRECT".to_owned(),
+            ],
+            proc_nodes: vec!["susfs_hide_modules".to_owned()],
+            ..builtin
+        };
+        let lkm_capabilities = capabilities(&lkm);
+        assert!(!lkm_capabilities.supported.contains(&"full_clone"));
+        assert!(!lkm_capabilities.supported.contains(&"avc_spoof"));
+        assert!(lkm_capabilities.supported.contains(&"hidden_modules"));
+        assert_eq!(lkm_capabilities.redirect_uid_schemes, [0, 1, 2, 3, 4]);
+        assert!(lkm_capabilities.supported.contains(&"static_kstat"));
+    }
+
+    #[test]
     fn uname_requires_exclusive_provider_only_when_saved() {
         let mut config = Config::default();
         assert!(!uname_conflicts(&config, true));
@@ -500,14 +759,25 @@ mod tests {
     #[test]
     fn status_reports_saved_uname_as_deferred_while_uts_is_active() {
         let mut config = Config::default();
-        assert_eq!(status_summary(&config, true).unwrap(), "idle");
+        let desired = apply::operations(&config).unwrap();
+        assert_eq!(
+            store::summarize(&store::State::default(), &desired, true),
+            "idle"
+        );
 
         config.settings.uname = Some(model::Uname {
             release: "6.1.0-test".to_owned(),
             version: "#1".to_owned(),
         });
-        assert_eq!(status_summary(&config, true).unwrap(), "deferred");
-        assert_eq!(status_summary(&config, false).unwrap(), "saved");
+        let desired = apply::operations(&config).unwrap();
+        assert_eq!(
+            store::summarize(&store::State::default(), &desired, true),
+            "deferred"
+        );
+        assert_eq!(
+            store::summarize(&store::State::default(), &desired, false),
+            "saved"
+        );
     }
 
     #[test]

@@ -11,6 +11,7 @@ use std::{collections::BTreeMap, fs, io::Write, os::unix::fs::MetadataExt};
 pub enum Stage {
     Live,
     PreMount,
+    LatePreMount,
     PostMount,
     Deferred,
 }
@@ -55,6 +56,7 @@ pub fn operations(config: &Config) -> Result<BTreeMap<String, String>> {
             Rule::Map { path } => ("map", path),
             Rule::Redirect { path, .. } => ("redirect", path),
             Rule::Kstat { path, .. } => ("kstat", path),
+            Rule::StaticKstat { path, .. } => ("static_kstat", path),
         };
         ops.insert(format!("{kind}:{path}"), serde_json::to_string(rule)?);
     }
@@ -253,9 +255,6 @@ fn rule(rule: &Rule, detection: &Detection) -> Result<()> {
             uid_scheme,
         } => {
             require(detection, "CONFIG_KSU_SUSFS_OPEN_REDIRECT")?;
-            if detection.implementation == "lkm" && *uid_scheme > 2 {
-                bail!("LKM UID schemes 3/4 are not equivalent to built-in SUSFS");
-            }
             let mut payload = abi::Redirect {
                 target: abi::bytes(path)?,
                 destination: abi::bytes(destination)?,
@@ -266,10 +265,20 @@ fn rule(rule: &Rule, detection: &Detection) -> Result<()> {
             abi::checked(payload.err)
         }
         Rule::Kstat { .. } => bail!("Kstat requires paired pre/post mount stages"),
+        Rule::StaticKstat { path, fields } => {
+            if !abi::static_kstat_profile(detection) {
+                bail!("Static kstat provider is not verified or its control is unavailable");
+            }
+            let metadata = fs::metadata(path)?;
+            let mut payload = abi::static_kstat_payload(path, fields, &metadata)?;
+            abi::call_checked(0x0005_5572, &mut payload)?;
+            abi::checked(payload.err)
+        }
     }
 }
 
 pub fn apply(config: &Config, detection: &Detection, phase: Stage) -> Result<Report> {
+    store::read_ownership()?.require_builtin()?;
     config.validate()?;
     if super::safe_mode() {
         bail!("SUSFS apply is disabled in safe mode");
@@ -278,9 +287,48 @@ pub fn apply(config: &Config, detection: &Detection, phase: Stage) -> Result<Rep
         bail!("SUSFS is unavailable or protocol is read-only");
     }
     #[cfg(target_os = "android")]
-    crate::utils::switch_mnt_ns(1)?;
+    crate::utils::switch_mnt_ns(1).context("Enter PID 1 mount namespace")?;
+    apply_with_state(
+        config,
+        phase,
+        store::read_state().context("Read SUSFS state")?,
+        store::write_state,
+        |key, value, state, report| {
+            if key.starts_with("kstat:") {
+                let parsed: Rule = serde_json::from_str(value)?;
+                let Rule::Kstat { path, full_clone } = parsed else {
+                    bail!("Invalid kstat rule");
+                };
+                apply_kstat(key, &path, full_clone, detection, phase, state, report).map(
+                    |applied| {
+                        if applied {
+                            Outcome::Applied
+                        } else {
+                            Outcome::Deferred
+                        }
+                    },
+                )
+            } else if key.starts_with("path:")
+                || key.starts_with("map:")
+                || key.starts_with("redirect:")
+                || key.starts_with("static_kstat:")
+            {
+                rule(&serde_json::from_str(value)?, detection).map(|()| Outcome::Applied)
+            } else {
+                setting(config, detection, key)
+            }
+        },
+    )
+}
+
+fn apply_with_state(
+    config: &Config,
+    phase: Stage,
+    mut state: State,
+    mut persist: impl FnMut(&State) -> Result<()>,
+    mut execute: impl FnMut(&str, &str, &mut State, &mut Report) -> Result<Outcome>,
+) -> Result<Report> {
     let desired = operations(config)?;
-    let mut state = store::read_state()?;
     let mut report = Report {
         status: "saved",
         applied: Vec::new(),
@@ -301,6 +349,25 @@ pub fn apply(config: &Config, detection: &Detection, phase: Stage) -> Result<Rep
         report.pending_reboot.push(key.clone());
     }
     for (key, value) in &desired {
+        if state.uncertain.contains_key(key) {
+            continue;
+        }
+        let other_kstat = key
+            .strip_prefix("kstat:")
+            .map(|path| format!("static_kstat:{path}"))
+            .or_else(|| {
+                key.strip_prefix("static_kstat:")
+                    .map(|path| format!("kstat:{path}"))
+            });
+        if other_kstat.as_ref().is_some_and(|other| {
+            state.applied.contains_key(other)
+                || state.snapshots.contains_key(other)
+                || state.uncertain.contains_key(other)
+                || state.kstat_pending.contains(other)
+        }) {
+            report.pending_reboot.push(key.clone());
+            continue;
+        }
         if state.applied.get(key) == Some(value) {
             continue;
         }
@@ -323,42 +390,20 @@ pub fn apply(config: &Config, detection: &Detection, phase: Stage) -> Result<Rep
         {
             continue;
         }
+        if !key.starts_with("kstat:")
+            && matches!(
+                phase,
+                Stage::PreMount | Stage::LatePreMount | Stage::PostMount
+            )
+        {
+            continue;
+        }
         state.uncertain.insert(key.clone(), value.clone());
-        if let Err(error) = store::write_state(&state) {
+        if let Err(error) = persist(&state) {
             state.uncertain.remove(key);
             return Err(error).context("Persist SUSFS write-ahead state");
         }
-        let result = if key.starts_with("kstat:") {
-            let parsed: Rule = serde_json::from_str(value)?;
-            let Rule::Kstat { path, full_clone } = parsed else {
-                bail!("Invalid kstat rule");
-            };
-            apply_kstat(
-                key,
-                &path,
-                full_clone,
-                detection,
-                phase,
-                &mut state,
-                &mut report,
-            )
-            .map(|applied| {
-                if applied {
-                    Outcome::Applied
-                } else {
-                    Outcome::Deferred
-                }
-            })
-        } else if phase == Stage::PreMount || phase == Stage::PostMount {
-            continue;
-        } else if key.starts_with("path:")
-            || key.starts_with("map:")
-            || key.starts_with("redirect:")
-        {
-            rule(&serde_json::from_str(value)?, detection).map(|()| Outcome::Applied)
-        } else {
-            setting(config, detection, key)
-        };
+        let result = execute(key, value, &mut state, &mut report);
         match result {
             Ok(Outcome::Applied) => {
                 state.uncertain.remove(key);
@@ -388,9 +433,16 @@ pub fn apply(config: &Config, detection: &Detection, phase: Stage) -> Result<Rep
             }
         }
         // Persist after each successful mutation: replay does not silently duplicate rules.
-        store::write_state(&state)?;
+        persist(&state).context("Persist SUSFS operation result")?;
     }
     report.failures.clone_from(&state.failures);
+    for key in state.uncertain.keys() {
+        report.failures.insert(
+            key.clone(),
+            "Previous operation result is unknown; reboot and verify the provider before retrying"
+                .to_owned(),
+        );
+    }
     report.skipped = state
         .skipped
         .iter()
@@ -412,7 +464,7 @@ pub fn apply(config: &Config, detection: &Detection, phase: Stage) -> Result<Rep
     } else {
         store::summarize(&state, &desired, false)
     };
-    store::write_state(&state)?;
+    persist(&state).context("Persist SUSFS summary")?;
     Ok(report)
 }
 
@@ -430,6 +482,9 @@ fn apply_kstat(
     #[cfg(not(target_os = "android"))]
     let late = false;
     let captured = state.kstat_pending.iter().any(|k| k == key);
+    if phase == Stage::LatePreMount && captured {
+        return Ok(false);
+    }
     if kstat_phase(phase, captured, late) == Some(false) {
         kstat(path, full_clone, detection, false)?;
         state.snapshots.insert(
@@ -454,7 +509,7 @@ fn apply_kstat(
 // Some(false): capture original; Some(true): retarget; None: cannot safely apply.
 const fn kstat_phase(phase: Stage, captured: bool, late: bool) -> Option<bool> {
     match (phase, captured, late) {
-        (Stage::PreMount, false, false) => Some(false),
+        (Stage::PreMount | Stage::LatePreMount, false, false) => Some(false),
         (Stage::PostMount, true, false) => Some(true),
         _ => None,
     }
@@ -463,10 +518,209 @@ const fn kstat_phase(phase: Stage, captured: bool, late: bool) -> Option<bool> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::cell::RefCell;
+
+    #[test]
+    fn changing_kstat_kind_requires_reboot_before_writing() {
+        let mut config = Config {
+            schema: 2,
+            ..Config::default()
+        };
+        config.rules.push(Rule::StaticKstat {
+            path: "/data/test".to_owned(),
+            fields: super::super::model::StaticKstat {
+                size: Some(1),
+                ..Default::default()
+            },
+        });
+        let mut state = State::default();
+        state
+            .snapshots
+            .insert("kstat:/data/test".to_owned(), "old".to_owned());
+        let report = apply_with_state(
+            &config,
+            Stage::Live,
+            state,
+            |_| Ok(()),
+            |_, _, _, _| panic!("must not replace an existing kstat rule"),
+        )
+        .unwrap();
+        assert_eq!(report.status, "pending_reboot");
+        assert_eq!(report.pending_reboot, ["static_kstat:/data/test"]);
+    }
+
+    #[test]
+    fn uncertain_operation_is_not_replayed() {
+        let mut config = Config {
+            schema: 2,
+            ..Config::default()
+        };
+        config.rules.push(Rule::StaticKstat {
+            path: "/data/test".to_owned(),
+            fields: super::super::model::StaticKstat {
+                size: Some(1),
+                ..Default::default()
+            },
+        });
+        let mut state = State::default();
+        state
+            .uncertain
+            .insert("static_kstat:/data/test".to_owned(), "prior".to_owned());
+        let saved = RefCell::new(State::default());
+        let report = apply_with_state(
+            &config,
+            Stage::Live,
+            state,
+            |state| {
+                *saved.borrow_mut() = state.clone();
+                Ok(())
+            },
+            |_, _, _, _| panic!("uncertain operations must not be replayed"),
+        )
+        .unwrap();
+        assert_eq!(report.status, "failed");
+        assert!(report.failures.contains_key("static_kstat:/data/test"));
+        assert!(
+            saved
+                .borrow()
+                .uncertain
+                .contains_key("static_kstat:/data/test")
+        );
+    }
+
+    #[test]
+    fn boot_stages_only_mark_attempted_operations_uncertain_and_retry_failures() {
+        let mut config = Config::default();
+        config.settings.logging = Some(true);
+        config.rules.push(Rule::Kstat {
+            path: "/data/test".to_owned(),
+            full_clone: false,
+        });
+        let persisted = RefCell::new(State::default());
+        let snapshots = RefCell::new(Vec::new());
+        let mut attempts = Vec::new();
+        for phase in [
+            Stage::PreMount,
+            Stage::PostMount,
+            Stage::PostMount,
+            Stage::Deferred,
+            Stage::Deferred,
+        ] {
+            let state = persisted.borrow().clone();
+            let report = apply_with_state(
+                &config,
+                phase,
+                state,
+                |state| {
+                    snapshots.borrow_mut().push(state.clone());
+                    *persisted.borrow_mut() = state.clone();
+                    Ok(())
+                },
+                |key, value, state, _| {
+                    assert_eq!(
+                        persisted.borrow().uncertain.get(key),
+                        Some(&value.to_owned())
+                    );
+                    attempts.push((phase, key.to_owned()));
+                    if key.starts_with("kstat:") {
+                        if phase == Stage::PreMount {
+                            state.kstat_pending.push(key.to_owned());
+                            state.snapshots.insert(key.to_owned(), value.to_owned());
+                            Ok(Outcome::Deferred)
+                        } else {
+                            state.kstat_pending.retain(|pending| pending != key);
+                            Ok(Outcome::Applied)
+                        }
+                    } else if attempts.iter().filter(|(_, key)| key == "logging").count() == 1 {
+                        bail!("temporary error")
+                    } else {
+                        Ok(Outcome::Applied)
+                    }
+                },
+            )
+            .unwrap();
+            if phase == Stage::PreMount || phase == Stage::PostMount {
+                assert!(!persisted.borrow().uncertain.contains_key("logging"));
+                assert_ne!(report.status, "failed");
+            } else if attempts.iter().filter(|(_, key)| key == "logging").count() == 1 {
+                assert!(report.failures.contains_key("logging"));
+            } else {
+                assert!(report.failures.is_empty());
+            }
+        }
+        assert_eq!(
+            attempts
+                .iter()
+                .filter(|(_, key)| key.starts_with("kstat:"))
+                .count(),
+            2
+        );
+        assert_eq!(
+            attempts.iter().filter(|(_, key)| key == "logging").count(),
+            2
+        );
+        let state = persisted.borrow();
+        assert!(state.failures.is_empty());
+        assert!(state.uncertain.is_empty());
+        assert_eq!(
+            store::summarize(&state, &operations(&config).unwrap(), false),
+            "applied"
+        );
+        assert!(
+            snapshots
+                .borrow()
+                .iter()
+                .any(|state| state.uncertain.contains_key("logging"))
+        );
+    }
+
+    #[test]
+    fn failed_write_ahead_persistence_prevents_execution() {
+        let mut config = Config::default();
+        config.settings.logging = Some(true);
+        let mut executed = false;
+        let result = apply_with_state(
+            &config,
+            Stage::Deferred,
+            State::default(),
+            |_| bail!("storage unavailable"),
+            |_, _, _, _| {
+                executed = true;
+                Ok(Outcome::Applied)
+            },
+        );
+        assert!(result.is_err());
+        assert!(!executed);
+    }
+
+    #[test]
+    fn deferred_stage_does_not_erase_existing_uncertainty() {
+        let mut config = Config::default();
+        config.settings.logging = Some(true);
+        let mut state = State::default();
+        state
+            .uncertain
+            .insert("logging".to_owned(), "true".to_owned());
+        let saved = RefCell::new(State::default());
+        let report = apply_with_state(
+            &config,
+            Stage::PreMount,
+            state,
+            |state| {
+                *saved.borrow_mut() = state.clone();
+                Ok(())
+            },
+            |_, _, _, _| panic!("deferred operation must not run"),
+        )
+        .unwrap();
+        assert_eq!(report.status, "failed");
+        assert!(saved.borrow().uncertain.contains_key("logging"));
+    }
 
     #[test]
     fn dynamic_kstat_requires_the_real_pre_post_pair() {
         assert_eq!(kstat_phase(Stage::PreMount, false, false), Some(false));
+        assert_eq!(kstat_phase(Stage::LatePreMount, false, false), Some(false));
         assert_eq!(kstat_phase(Stage::PostMount, true, false), Some(true));
         assert_eq!(kstat_phase(Stage::PostMount, false, false), None);
         assert_eq!(kstat_phase(Stage::PreMount, true, false), None);
@@ -476,6 +730,7 @@ mod tests {
         }
         for phase in [
             Stage::PreMount,
+            Stage::LatePreMount,
             Stage::PostMount,
             Stage::Deferred,
             Stage::Live,
@@ -483,6 +738,41 @@ mod tests {
             assert_eq!(kstat_phase(phase, false, true), None);
             assert_eq!(kstat_phase(phase, true, true), None);
         }
+    }
+
+    #[test]
+    fn late_pre_mount_captures_missing_rules_once() {
+        let mut config = Config::default();
+        config.rules.push(Rule::Kstat {
+            path: "/data/test".to_owned(),
+            full_clone: false,
+        });
+        let persisted = RefCell::new(State::default());
+        for _ in 0..2 {
+            let state = persisted.borrow().clone();
+            let report = apply_with_state(
+                &config,
+                Stage::LatePreMount,
+                state,
+                |state| {
+                    *persisted.borrow_mut() = state.clone();
+                    Ok(())
+                },
+                |key, value, state, _| {
+                    if !state.kstat_pending.iter().any(|pending| pending == key) {
+                        state.kstat_pending.push(key.to_owned());
+                        state.snapshots.insert(key.to_owned(), value.to_owned());
+                    }
+                    Ok(Outcome::Deferred)
+                },
+            )
+            .unwrap();
+            assert!(report.pending_reboot.is_empty());
+        }
+        assert_eq!(
+            persisted.borrow().kstat_pending,
+            ["kstat:/data/test".to_owned()]
+        );
     }
 
     #[test]

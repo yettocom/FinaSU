@@ -55,6 +55,21 @@ internal fun statusStateTexts(state: HomeUiState): List<Pair<String, String>> {
     }
 }
 
+@Composable
+internal fun kernelHookValue(state: KernelHookState): String {
+    val backend = when (state.backend) {
+        KernelHookBackend.TRACEPOINT -> stringResource(R.string.home_hook_type_tracepoint)
+        KernelHookBackend.SUSFS_INLINE -> stringResource(R.string.home_hook_type_susfs_inline)
+        KernelHookBackend.UNKNOWN,
+        KernelHookBackend.INVALID -> stringResource(R.string.home_hook_type_unknown)
+    }
+    return if (state.failed) {
+        stringResource(R.string.home_hook_type_failed, backend)
+    } else {
+        backend
+    }
+}
+
 /** The install action for a kernel that has the module but never loaded it. */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -98,18 +113,21 @@ internal fun StatusCard(
 ) {
     val ksuActive = state.ksuVersion != null
     val notInstalled = !ksuActive && state.kernelVersion.isGKI()
+    val hookFailed = state.kernelHook.failed
 
     val workCardStyle = HomeWorkCardControl.style(
         layout = HomeWorkCardLayout.Circle,
-        working = ksuActive,
+        working = ksuActive && !hookFailed,
     )
 
     val statusIcon = when {
+        ksuActive && hookFailed -> Icons.Rounded.Warning
         ksuActive -> Icons.Rounded.CheckCircle
         notInstalled -> Icons.Rounded.Warning
         else -> Icons.Rounded.Block
     }
     val statusTitle = when {
+        ksuActive && hookFailed -> kernelHookValue(state.kernelHook)
         ksuActive -> stringResource(R.string.home_working)
         notInstalled -> stringResource(R.string.home_not_installed)
         else -> stringResource(R.string.home_unsupported)

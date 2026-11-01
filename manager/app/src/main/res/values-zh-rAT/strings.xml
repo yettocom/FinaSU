@@ -29,6 +29,11 @@
     <string name="home_metric_storage_swap">神念交换</string>
     <string name="home_version">神恩等级</string>
     <string name="home_running_mode">运转模式</string>
+    <string name="home_hook_type">圣引之式</string>
+    <string name="home_hook_type_tracepoint">Tracepoint</string>
+    <string name="home_hook_type_susfs_inline">SUSFS Inline</string>
+    <string name="home_hook_type_unknown">旧版 / 未知</string>
+    <string name="home_hook_type_failed">%1$s（异常）</string>
     <string name="home_running_status">运转状态</string>
     <string name="home_state_on">已唤醒</string>
     <string name="home_working_version">神恩等级：%s</string>
@@ -274,6 +279,13 @@
     <string name="settings_kernel_umount">解除圣光阵（灵魂之力层面）</string>
     <string name="settings_kernel_umount_summary">于灵魂之力层为所需圣器解除圣光阵</string>
     <string name="settings_finasu_hide">FinaSU Hide</string>
+    <string name="settings_kernel_umount_unknown">未能勘验功能是否可施焉</string>
+    <string name="settings_kernel_umount_values">今：%1$s · 重启后：%2$s焉</string>
+    <string name="settings_kernel_umount_on">开启焉</string>
+    <string name="settings_kernel_umount_off">关闭焉</string>
+    <string name="settings_kernel_umount_value_unknown">未知或未留存焉</string>
+    <string name="settings_kernel_umount_write_failed">未能修改卸载模块总开关焉</string>
+    <string name="settings_kernel_umount_save_failed">已修改，但未能留存供重启后使用焉</string>
     <string name="umount_paths_title">自定卸载圣光阵</string>
     <string name="umount_paths_summary">掌管指定圣器启程时不得窥见之圣光阵</string>
     <string name="umount_paths_intro_title">更易圣器真正所见之典</string>
@@ -378,6 +390,9 @@
     <string name="settings_folk_mount_reboot_hint">神翼再生后生效。</string>
     <string name="settings_folk_mount_metamodule_compat_hint">已有唤醒之 metamodule；其咒语或与内建圣光引擎不合。</string>
     <string name="settings_folk_mount_nomount_unavailable_hint">NoMount 驱动无所应答；此番圣启归于内建圣光引擎。</string>
+    <string name="settings_folk_mount_nomount_ui_fallback">前番圣启未确认 NoMount 圣面已备；此番圣启暂归 Built-in 圣光引擎。此非 NoMount 故障之证焉。</string>
+    <string name="settings_folk_mount_nomount_ui_unconfirmed">未确认 NoMount 圣面已备；下次圣启当归 Built-in 圣光引擎焉。</string>
+    <string name="settings_folk_mount_step_interrupted">前番挂载圣仪未竟；此番圣启暂越之，以免旧患复临焉。</string>
     <string name="settings_folk_mount_write_failed">更改 Folk Mount 模式神恩未至。</string>
     <string name="settings_nomount">NoMount</string>
     <string name="nomount_section_driver">驱动</string>
@@ -498,6 +513,8 @@
     <string name="settings_hide_home_mount_summary">隐去首页圣示中模块挂载之一行。</string>
     <string name="settings_hide_home_kernel_full_version">隐去灵魂之力全卷</string>
     <string name="settings_hide_home_kernel_full_version_summary">隐去首页圣示中灵魂之力全卷之一行。</string>
+    <string name="settings_hide_home_hook_type">隐去圣引之式</string>
+    <string name="settings_hide_home_hook_type_summary">隐去首页圣示中圣引之式之一行。</string>
     <string name="settings_category_general">圣域基础</string>
     <string name="settings_category_appearance">圣光外观</string>
     <string name="settings_category_behavior">神谕指令</string>
@@ -665,6 +682,10 @@
     <string name="settings_finasu_hide_failed">更易 FinaSU Hide 神恩未至</string>
     <string name="settings_adb_root" translatable="false">ADB Root</string>
     <string name="settings_adb_root_summary">以 Root 之权运转 adbd 守望圣使</string>
+    <string name="feature_external_changes_title">共享圣设已被外部修改焉</string>
+    <string name="feature_external_changes_summary">外部模块或掌圣者在 FinaSU 施展已留存圣设后修改了这些运行值。FinaSU 不会自行覆盖焉。</string>
+    <string name="feature_external_value_on">开启焉</string>
+    <string name="feature_external_value_off">关闭焉</string>
     <string name="menu_sort">排列</string>
     <string name="sort_by_name">圣器名</string>
     <string name="sort_by_package_name">圣匣名</string>

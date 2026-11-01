@@ -6,6 +6,7 @@ import com.materialkolor.dynamiccolor.ColorSpec
 import me.weishu.kernelsu.data.model.FolkMountMode
 import me.weishu.kernelsu.data.model.FolkMountStatus
 import me.weishu.kernelsu.data.model.FolkZygiskStatus
+import me.weishu.kernelsu.data.model.FeatureChange
 import me.weishu.kernelsu.data.model.HomeLayoutStyle
 import me.weishu.kernelsu.data.model.LayoutVariant
 import me.weishu.kernelsu.data.model.NomountStatus
@@ -40,6 +41,8 @@ data class SettingsUiState(
     val hideHomeSusfs: Boolean = false,
     val hideHomeMount: Boolean = false,
     val hideHomeKernelFullVersion: Boolean = false,
+    val hideHomeHookType: Boolean = false,
+    val hookTypeAvailable: Boolean = false,
     val kernelFullVersionAvailable: Boolean = false,
 
     // Su Compat
@@ -49,7 +52,10 @@ data class SettingsUiState(
 
     // Kernel Umount
     val kernelUmountStatus: String = "",
-    val isKernelUmountEnabled: Boolean = false,
+    val kernelUmountValue: Long? = null,
+    val kernelUmountPersistValue: Long? = null,
+    val externalFeatureChanges: List<FeatureChange> = emptyList(),
+    val isKernelUmountWriting: Boolean = false,
 
     // SELinux Hide
     val selinuxHideStatus: String = "",
@@ -118,6 +124,9 @@ data class SettingsUiState(
     val isDynamicManagerAvailable: Boolean = true
 )
 
+internal fun canChangeKernelUmount(status: String, value: Long?, writing: Boolean): Boolean =
+    status == "supported" && value != null && !writing
+
 @Immutable
 data class SettingsScreenActions(
     val onSetCheckUpdate: (Boolean) -> Unit,
@@ -165,6 +174,7 @@ data class SettingsScreenActions(
     val onSetHideHomeSusfs: (Boolean) -> Unit,
     val onSetHideHomeMount: (Boolean) -> Unit,
     val onSetHideHomeKernelFullVersion: (Boolean) -> Unit,
+    val onSetHideHomeHookType: (Boolean) -> Unit,
     val onSetEnableNavigationBadge: (Boolean) -> Unit,
     val onSetEnablePredictiveBack: (Boolean) -> Unit,
     val onSetPageScale: (Float) -> Unit,

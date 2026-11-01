@@ -29,6 +29,11 @@
     <string name="home_metric_storage_swap">Swap</string>
     <string name="home_version">الإصدار</string>
     <string name="home_running_mode">وضع التشغيل</string>
+    <string name="home_hook_type">نوع الهوك</string>
+    <string name="home_hook_type_tracepoint">Tracepoint</string>
+    <string name="home_hook_type_susfs_inline">SUSFS Inline</string>
+    <string name="home_hook_type_unknown">قديم / غير معروف</string>
+    <string name="home_hook_type_failed">%1$s (غير طبيعي)</string>
     <string name="home_running_status">حالة التشغيل</string>
     <string name="home_state_on">مفعّل</string>
     <string name="home_working_version">الإصدار: %s</string>
@@ -276,6 +281,13 @@
     <string name="settings_kernel_umount">إلغاء تحميل النواة</string>
     <string name="settings_kernel_umount_summary">سلوك إلغاء تحميل مستوى النواة الذي يسيطر عليه KernelSU</string>
     <string name="settings_finasu_hide">FinaSU Hide</string>
+    <string name="settings_kernel_umount_unknown">غير قادر على تأكيد توفر الميزة</string>
+    <string name="settings_kernel_umount_values">الحالي: %1$s · تم الحفظ لإعادة التشغيل: %2$s</string>
+    <string name="settings_kernel_umount_on">مفعّل</string>
+    <string name="settings_kernel_umount_off">معطّل</string>
+    <string name="settings_kernel_umount_value_unknown">غير معروف أو لم يتم حفظه</string>
+    <string name="settings_kernel_umount_write_failed">لا يمكن تغيير إلغاء تحميل الوحدة النمطية</string>
+    <string name="settings_kernel_umount_save_failed">تم التغيير، ولكن لا يمكن حفظه لإعادة التشغيل</string>
     <string name="umount_paths_title">نقاط التركيب المخصصة لإلغاء التحميل</string>
     <string name="umount_paths_summary">إدارة نقاط التركيب التي يجب ألا تراها التطبيقات المحددة عند بدء التشغيل</string>
     <string name="umount_paths_intro_title">يغيّر الملفات التي يراها التطبيق فعليًا</string>
@@ -380,6 +392,9 @@
     <string name="settings_folk_mount_reboot_hint">يُطبَّق بعد إعادة التشغيل.</string>
     <string name="settings_folk_mount_metamodule_compat_hint">توجد وحدة وصفية مفعّلة؛ قد لا تعمل سكربتاتها مع المحرك المدمج.</string>
     <string name="settings_folk_mount_nomount_unavailable_hint">مشغّل NoMount لا يستجيب؛ يتراجع هذا الإقلاع إلى المحرك المدمج.</string>
+    <string name="settings_folk_mount_nomount_ui_fallback">لم يؤكد الإقلاع السابق جاهزية واجهة NoMount؛ يستخدم هذا الإقلاع محرك Built-in. هذا لا يثبت وجود عطل في NoMount.</string>
+    <string name="settings_folk_mount_nomount_ui_unconfirmed">لم يتم تأكيد جاهزية واجهة NoMount؛ سيستخدم الإقلاع التالي محرك Built-in.</string>
+    <string name="settings_folk_mount_step_interrupted">لم تكتمل خطوة تركيب سابقة؛ تخطاها هذا الإقلاع لتجنب تكرار الفشل نفسه.</string>
     <string name="settings_folk_mount_write_failed">فشل تغيير وضع Folk Mount.</string>
     <string name="settings_nomount">NoMount</string>
     <string name="nomount_section_driver">المشغّل</string>
@@ -491,6 +506,8 @@
     <string name="settings_hide_home_mount_summary">إزالة سطر تركيب الوحدات من بطاقة معلومات الرئيسية.</string>
     <string name="settings_hide_home_kernel_full_version">إخفاء بناء النواة الكامل</string>
     <string name="settings_hide_home_kernel_full_version_summary">إزالة سطر بناء النواة الكامل من بطاقة معلومات الرئيسية.</string>
+    <string name="settings_hide_home_hook_type">إخفاء نوع الهوك</string>
+    <string name="settings_hide_home_hook_type_summary">إزالة سطر نوع الهوك من بطاقة معلومات الرئيسية.</string>
     <string name="settings_category_general">عام</string>
     <string name="settings_category_appearance">المظهر</string>
     <string name="settings_category_behavior">السلوك</string>
@@ -658,6 +675,10 @@
     <string name="settings_finasu_hide_failed">تعذّر تغيير FinaSU Hide</string>
     <string name="settings_adb_root" translatable="false">ADB Root</string>
     <string name="settings_adb_root_summary">تشغيل خدمة adbd بصلاحيات الجذر</string>
+    <string name="feature_external_changes_title">تم تغيير الإعدادات المشتركة خارج FinaSU</string>
+    <string name="feature_external_changes_summary">قامت وحدة خارجية أو مدير بتغيير قيم وقت التشغيل هذه بعد أن طبق FinaSU إعداداته المحفوظة. لن يقوم FinaSU بالكتابة فوقها تلقائيًا.</string>
+    <string name="feature_external_value_on">مفعّل</string>
+    <string name="feature_external_value_off">معطّل</string>
     <string name="menu_sort">فرز</string>
     <string name="sort_by_name">اسم التطبيق</string>
     <string name="sort_by_package_name">اسم الحزمة</string>

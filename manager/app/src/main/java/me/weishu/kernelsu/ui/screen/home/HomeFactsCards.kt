@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material.icons.filled.Tag
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Vaccines
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.Icon
@@ -79,6 +80,12 @@ internal fun HomeFactsTile(
                     value = value,
                 )
             }
+        }
+        if (state.ksuVersion != null && !display.hideHookType) {
+            HomeFactRow(
+                label = stringResource(R.string.home_hook_type),
+                value = kernelHookValue(state.kernelHook),
+            )
         }
         HomeFactRow(
             label = stringResource(R.string.home_device_model),
@@ -145,6 +152,7 @@ internal fun HomeFactRow(
 @Composable
 internal fun InfoCard(
     systemInfo: SystemInfo,
+    kernelHook: KernelHookState? = null,
     modifier: Modifier = Modifier,
     susfs: me.weishu.kernelsu.data.susfs.SusfsStatus = me.weishu.kernelsu.data.susfs.SusfsStatus(),
     zygiskProvider: String? = null,
@@ -180,6 +188,13 @@ internal fun InfoCard(
                         value = value,
                     )
                 }
+            }
+            if (kernelHook != null && !display.hideHookType) {
+                InfoRow(
+                    icon = Icons.Filled.Tune,
+                    label = stringResource(R.string.home_hook_type),
+                    value = kernelHookValue(kernelHook),
+                )
             }
             InfoRow(
                 icon = Icons.Filled.Smartphone,
@@ -226,7 +241,8 @@ internal fun InfoCard(
                 InfoRow(
                     icon = Icons.Rounded.VisibilityOff,
                     label = stringResource(R.string.susfs_title),
-                    value = "${susfs.version} · ${susfs.implementation} · $management",
+                    value = listOf(susfs.version, susfs.implementation, management)
+                        .filter(String::isNotBlank).joinToString(" · "),
                     modifier = Modifier
                         .folkPressScale(interactionSource)
                         .clickable(
@@ -239,7 +255,7 @@ internal fun InfoCard(
                         ),
                     trailingContent = {
                         Text(
-                            text = stringResource(R.string.susfs_manage),
+                            text = stringResource(if (susfs.writable) R.string.susfs_manage else R.string.susfs_view_status),
                             style = FolkType.Summary,
                             color = MaterialTheme.colorScheme.primary,
                         )
@@ -256,14 +272,16 @@ private fun SusfsHomeRow(status: me.weishu.kernelsu.data.susfs.SusfsStatus, onCl
     val overColor = LocalHomeTileCardContentColor.current
     Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 4.dp)) {
         Column(Modifier.weight(1f)) {
-            Text("SUSFS · ${status.version} · ${status.implementation}", style = FolkType.Summary,
+            val title = listOf("SUSFS", status.version, status.implementation)
+                .filter(String::isNotBlank).joinToString(" · ")
+            Text(title, style = FolkType.Summary,
                 color = overColor ?: MaterialTheme.colorScheme.onSurface)
             Text(me.weishu.kernelsu.ui.screen.susfsManagementLabel(status.management), style = FolkType.Machine,
                 color = overColor?.copy(alpha = 0.8f)
                     ?: LocalWallpaperSupportingColor.current
                     ?: MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        Text(stringResource(R.string.susfs_manage), style = FolkType.Summary,
+        Text(stringResource(if (status.writable) R.string.susfs_manage else R.string.susfs_view_status), style = FolkType.Summary,
             color = overColor ?: MaterialTheme.colorScheme.primary)
     }
 }

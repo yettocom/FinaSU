@@ -80,7 +80,7 @@ Solid lines in the diagram mean FinaSU provides or drives the capability directl
 
 ### Kernel Patches and LKMs
 
-**SUSFS** is not implemented in this repository. FinaSU only provides state detection, configuration and safe integration. Without a kernel patch you can use a matching SUSFS-LKM, but its feature scope is usually smaller than the source-integrated version.
+**SUSFS** is not implemented in this repository. FinaSU only provides state detection, configuration and safe integration. Without a kernel patch you can use a matching SUSFS-LKM, but its feature scope is usually smaller than the source-integrated version. A source-integrated build selects Tracepoint or SUSFS Inline at compile time; a SUSFS-LKM does not turn an existing Tracepoint driver into Inline.
 
 ## Switches, Configuration and This Boot
 
@@ -169,7 +169,7 @@ Different features use different verification standards. For example FolkZygisk 
 ├── netisolate.json             # Network Isolation persistent configuration
 ├── nomount_runtime             # last NoMount injection result
 ├── nomount_uids                # NoMount exception UIDs
-└── folksu-susfs/               # SUSFS integration configuration and state
+└── finasu-susfs/               # SUSFS integration configuration and state
 ```
 
 These files are for diagnostics, not manual configuration entry points. Editing them directly can bypass validation, locks and transaction rollback, causing the Manager display to differ from the kernel's actual state.

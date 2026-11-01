@@ -29,6 +29,11 @@
     <string name="home_metric_storage_swap">Swap</string>
     <string name="home_version">Версия</string>
     <string name="home_running_mode">Режим работы</string>
+    <string name="home_hook_type">Тип хука</string>
+    <string name="home_hook_type_tracepoint">Tracepoint</string>
+    <string name="home_hook_type_susfs_inline">SUSFS Inline</string>
+    <string name="home_hook_type_unknown">Старая версия / неизвестно</string>
+    <string name="home_hook_type_failed">%1$s (сбой)</string>
     <string name="home_running_status">Состояние</string>
     <string name="home_state_on">Вкл.</string>
     <string name="home_working_version">Версия: %s</string>
@@ -276,6 +281,13 @@
     <string name="settings_kernel_umount">Размонтировать модули (на уровне ядра)</string>
     <string name="settings_kernel_umount_summary">Размонтировать модули в ядре для профиля приложения.</string>
     <string name="settings_finasu_hide">FinaSU Hide</string>
+    <string name="settings_kernel_umount_unknown">Не удалось подтвердить доступность функции.</string>
+    <string name="settings_kernel_umount_values">Текущее: %1$s · Сохранено для перезагрузки: %2$s</string>
+    <string name="settings_kernel_umount_on">Включено</string>
+    <string name="settings_kernel_umount_off">Выключено</string>
+    <string name="settings_kernel_umount_value_unknown">Неизвестно или не сохранено</string>
+    <string name="settings_kernel_umount_write_failed">Не удалось изменить размонтирование модуля.</string>
+    <string name="settings_kernel_umount_save_failed">Изменено, но не удалось сохранить для следующей загрузки</string>
     <string name="umount_paths_title">Пользовательские точки монтирования для размонтирования</string>
     <string name="umount_paths_summary">Управление точками монтирования, которые выбранные приложения не должны видеть при запуске</string>
     <string name="umount_paths_intro_title">Изменяет файлы, которые приложение действительно видит</string>
@@ -380,6 +392,9 @@
     <string name="settings_folk_mount_reboot_hint">Вступит в силу после перезагрузки.</string>
     <string name="settings_folk_mount_metamodule_compat_hint">Присутствует включённый метамодуль; его скрипты могут не работать со встроенным движком.</string>
     <string name="settings_folk_mount_nomount_unavailable_hint">Драйвер NoMount не отвечает; в этой загрузке используется встроенный движок.</string>
+    <string name="settings_folk_mount_nomount_ui_fallback">При предыдущей загрузке готовность интерфейса NoMount не подтвердилась; в этой загрузке используется движок Built-in. Это не доказывает неисправность NoMount.</string>
+    <string name="settings_folk_mount_nomount_ui_unconfirmed">Готовность интерфейса NoMount не подтвердилась; при следующей загрузке будет использоваться движок Built-in.</string>
+    <string name="settings_folk_mount_step_interrupted">Предыдущий этап монтирования не завершился; эта загрузка пропустила его, чтобы не повторять ту же ошибку.</string>
     <string name="settings_folk_mount_write_failed">Не удалось изменить режим Folk Mount.</string>
     <string name="settings_nomount">NoMount</string>
     <string name="nomount_section_driver">Драйвер</string>
@@ -491,6 +506,8 @@
     <string name="settings_hide_home_mount_summary">Убирает строку монтирования модулей с карточки информации на главном экране.</string>
     <string name="settings_hide_home_kernel_full_version">Скрыть сборку ядра</string>
     <string name="settings_hide_home_kernel_full_version_summary">Убирает строку сборки ядра с карточки информации на главном экране.</string>
+    <string name="settings_hide_home_hook_type">Скрыть тип хука</string>
+    <string name="settings_hide_home_hook_type_summary">Убирает строку типа хука с карточки информации на главном экране.</string>
     <string name="settings_category_general">Общие</string>
     <string name="settings_category_appearance">Внешний вид</string>
     <string name="settings_category_behavior">Поведение</string>
@@ -658,6 +675,10 @@
     <string name="settings_finasu_hide_failed">Не удалось изменить FinaSU Hide</string>
     <string name="settings_adb_root" translatable="false">ADB Root</string>
     <string name="settings_adb_root_summary">Запускать демон adbd с правами Root</string>
+    <string name="feature_external_changes_title">Общие настройки были изменены за пределами FinaSU.</string>
+    <string name="feature_external_changes_summary">Внешний модуль или менеджер изменил эти значения времени выполнения после того, как FinaSU применила сохраненные настройки. FinaSU не будет перезаписывать их автоматически.</string>
+    <string name="feature_external_value_on">Включено</string>
+    <string name="feature_external_value_off">Выключено</string>
     <string name="menu_sort">Сортировка</string>
     <string name="sort_by_name">Имя приложения</string>
     <string name="sort_by_package_name">Имя пакета</string>

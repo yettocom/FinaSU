@@ -19,6 +19,7 @@ class KeystoreSecretStore(
     context: Context,
     private val prefsName: String = PREFS_NAME,
     private val alias: String = KEY_ALIAS,
+    private val legacyAlias: String = LEGACY_KEY_ALIAS,
 ) : SecretStore {
 
     private val prefs = context.applicationContext.getSharedPreferences(prefsName, Context.MODE_PRIVATE)
@@ -35,7 +36,14 @@ class KeystoreSecretStore(
 
     override fun get(key: String): String? {
         val record = prefs.getString(key, null) ?: return null
-        return runCatching { SecretCodec.decrypt(secretKey(), record) }.getOrNull()
+        decryptRecord(alias, record)?.let { return it }
+        val value = decryptRecord(legacyAlias, record) ?: return null
+        runCatching {
+            SecretCodec.encryptWithGeneratedIv(secretKey(), value)
+        }.onSuccess { migrated ->
+            prefs.edit { putString(key, migrated) }
+        }
+        return value
     }
 
     override fun remove(key: String) {
@@ -43,8 +51,7 @@ class KeystoreSecretStore(
     }
 
     private fun secretKey(): SecretKey {
-        val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
-        (keyStore.getEntry(alias, null) as? KeyStore.SecretKeyEntry)?.let { return it.secretKey }
+        existingKey(alias)?.let { return it }
         val generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, ANDROID_KEYSTORE)
         generator.init(
             KeyGenParameterSpec.Builder(alias, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
@@ -56,10 +63,21 @@ class KeystoreSecretStore(
         return generator.generateKey()
     }
 
+    private fun decryptRecord(alias: String, record: String): String? =
+        runCatching {
+            existingKey(alias)?.let { SecretCodec.decrypt(it, record) }
+        }.getOrNull()
+
+    private fun existingKey(alias: String): SecretKey? {
+        val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
+        return (keyStore.getEntry(alias, null) as? KeyStore.SecretKeyEntry)?.secretKey
+    }
+
     companion object {
         const val PREFS_NAME = "backup_secrets"
         private const val TAG = "KeystoreSecretStore"
         private const val ANDROID_KEYSTORE = "AndroidKeyStore"
-        private const val KEY_ALIAS = "folksu_backup_secret_v1"
+        private const val KEY_ALIAS = "finasu_backup_secret_v1"
+        private const val LEGACY_KEY_ALIAS = "folksu_backup_secret_v1"
     }
 }

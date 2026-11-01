@@ -20,6 +20,8 @@
 #include "hook/setuid_hook.h"
 #include "hook/syscall_hook.h"
 #include "hook/syscall_event_bridge.h"
+#ifdef __aarch64__
+#endif
 #if defined(__riscv)
 #include "hook/riscv64/syscall_regs.h"
 #endif
@@ -145,32 +147,52 @@ static void ksu_sys_enter_handler(void *data, struct pt_regs *regs, long id)
 }
 #endif
 
-void __init ksu_syscall_hook_manager_init(void)
+int __init ksu_syscall_hook_manager_init(void)
 {
-    int ret;
+    int ret = 0;
+    int err;
     pr_info("hook_manager: ksu_hook_manager_init called\n");
+
+    if (!ksu_syscall_table || ksu_dispatcher_nr < 0) {
+        pr_err("hook_manager: syscall dispatcher is unavailable\n");
+        return -ENOENT;
+    }
 
 #ifdef CONFIG_KRETPROBES
     syscall_regfunc_rp = init_kretprobe("syscall_regfunc", syscall_regfunc_handler);
     syscall_unregfunc_rp = init_kretprobe("syscall_unregfunc", syscall_unregfunc_handler);
+    if (!syscall_regfunc_rp || !syscall_unregfunc_rp) {
+        ret = -ENOENT;
+    }
 #endif
 
     // Register syscall hooks via dispatcher
 #ifndef CONFIG_KSU_SUSFS
-    ksu_register_syscall_hook(__NR_setresuid, ksu_hook_setresuid);
+    err = ksu_register_syscall_hook(__NR_setresuid, ksu_hook_setresuid);
+    if (err)
+        ret = err;
 #endif
-    ksu_register_syscall_hook(__NR_execve, ksu_hook_execve);
-    ksu_register_syscall_hook(__NR_execveat, ksu_hook_execveat);
-    ksu_register_syscall_hook(__NR_newfstatat, ksu_hook_newfstatat);
-    ksu_register_syscall_hook(__NR_faccessat, ksu_hook_faccessat);
+    err = ksu_register_syscall_hook(__NR_execve, ksu_hook_execve);
+    if (err)
+        ret = err;
+    err = ksu_register_syscall_hook(__NR_execveat, ksu_hook_execveat);
+    if (err)
+        ret = err;
+    err = ksu_register_syscall_hook(__NR_newfstatat, ksu_hook_newfstatat);
+    if (err)
+        ret = err;
+    err = ksu_register_syscall_hook(__NR_faccessat, ksu_hook_faccessat);
+    if (err)
+        ret = err;
 
 #ifdef CONFIG_HAVE_SYSCALL_TRACEPOINTS
-    ret = register_trace_prio_sys_enter(ksu_sys_enter_handler, NULL, INT_MIN);
+    err = register_trace_prio_sys_enter(ksu_sys_enter_handler, NULL, INT_MIN);
 #ifndef CONFIG_KRETPROBES
     ksu_mark_running_process_locked();
 #endif
-    if (ret) {
-        pr_err("hook_manager: failed to register sys_enter tracepoint: %d\n", ret);
+    if (err) {
+        pr_err("hook_manager: failed to register sys_enter tracepoint: %d\n", err);
+        ret = err;
     } else {
         pr_info("hook_manager: sys_enter tracepoint registered\n");
     }
@@ -178,6 +200,7 @@ void __init ksu_syscall_hook_manager_init(void)
 
     ksu_setuid_hook_init();
     ksu_sucompat_init();
+    return ret;
 }
 
 void __exit ksu_syscall_hook_manager_exit(void)

@@ -29,6 +29,11 @@
     <string name="home_metric_storage_swap">交换存货</string>
     <string name="home_version">版本</string>
     <string name="home_running_mode">开工模式</string>
+    <string name="home_hook_type">挂钩手法</string>
+    <string name="home_hook_type_tracepoint">Tracepoint</string>
+    <string name="home_hook_type_susfs_inline">SUSFS Inline</string>
+    <string name="home_hook_type_unknown">旧版 / 未知</string>
+    <string name="home_hook_type_failed">%1$s（异常）</string>
     <string name="home_running_status">开张状态</string>
     <string name="home_state_on">已开火</string>
     <string name="home_working_version">版本：%s</string>
@@ -274,6 +279,13 @@
     <string name="settings_kernel_umount">收招牌菜（秘酱料级）</string>
     <string name="settings_kernel_umount_summary">在秘酱料里给要的应用收起招牌菜</string>
     <string name="settings_finasu_hide">FinaSU Hide</string>
+    <string name="settings_kernel_umount_unknown">弄不成拿准功能是否能用嘞</string>
+    <string name="settings_kernel_umount_values">眼下：%1$s · 再开火后：%2$s嘞</string>
+    <string name="settings_kernel_umount_on">开启嘞</string>
+    <string name="settings_kernel_umount_off">关闭嘞</string>
+    <string name="settings_kernel_umount_value_unknown">未知或未收好嘞</string>
+    <string name="settings_kernel_umount_write_failed">弄不成修改卸载模块总开关嘞</string>
+    <string name="settings_kernel_umount_save_failed">已修改，但弄不成收好供再开火后使用嘞</string>
     <string name="umount_paths_title">自定义收起招牌菜</string>
     <string name="umount_paths_summary">管理指定应用开张时看不到的招牌菜</string>
     <string name="umount_paths_intro_title">改的是应用真正端上桌的菜</string>
@@ -378,6 +390,9 @@
     <string name="settings_folk_mount_reboot_hint">重新开火才认。</string>
     <string name="settings_folk_mount_metamodule_compat_hint">有开着的 metamodule；它的脚本跟内建家伙八成不合。</string>
     <string name="settings_folk_mount_nomount_unavailable_hint">NoMount 驱动没应声；这回开火退回内建家伙。</string>
+    <string name="settings_folk_mount_nomount_ui_fallback">上回开火没确认 NoMount 界面备齐；这回先让 Built-in 家伙掌勺。这可不能证明 NoMount 坏了嘞</string>
+    <string name="settings_folk_mount_nomount_ui_unconfirmed">没确认 NoMount 界面备齐；下回开火先用 Built-in 家伙撑场嘞</string>
+    <string name="settings_folk_mount_step_interrupted">上回挂载没走完；这回先跳过，免得同一锅又糊嘞</string>
     <string name="settings_folk_mount_write_failed">Folk Mount 模式没改成。</string>
     <string name="settings_nomount">NoMount</string>
     <string name="nomount_section_driver">驱动</string>
@@ -498,6 +513,8 @@
     <string name="settings_hide_home_mount_summary">把模块挂载这行从首页信息牌上撤掉。</string>
     <string name="settings_hide_home_kernel_full_version">收起内核全谱</string>
     <string name="settings_hide_home_kernel_full_version_summary">把内核全谱这行从首页信息牌上撤掉。</string>
+    <string name="settings_hide_home_hook_type">收起挂钩手法</string>
+    <string name="settings_hide_home_hook_type_summary">把挂钩手法这行从首页信息牌上撤掉。</string>
     <string name="settings_category_general">家常</string>
     <string name="settings_category_appearance">门面</string>
     <string name="settings_category_behavior">脾性</string>
@@ -665,6 +682,10 @@
     <string name="settings_finasu_hide_failed">FinaSU Hide 没改成功</string>
     <string name="settings_adb_root" translatable="false">ADB Root</string>
     <string name="settings_adb_root_summary">让 adbd 看店的拿着大厨权限干活</string>
+    <string name="feature_external_changes_title">共享配法已被外部修改嘞</string>
+    <string name="feature_external_changes_summary">外部模块或管事的在 FinaSU 套上已收好配法后修改了这些运行值。FinaSU 不会顺手覆盖嘞。</string>
+    <string name="feature_external_value_on">开启嘞</string>
+    <string name="feature_external_value_off">关闭嘞</string>
     <string name="menu_sort">排队</string>
     <string name="sort_by_name">菜名</string>
     <string name="sort_by_package_name">招牌号</string>

@@ -29,6 +29,11 @@
     <string name="home_metric_storage_swap">スワップ</string>
     <string name="home_version">バージョン</string>
     <string name="home_running_mode">動作モード</string>
+    <string name="home_hook_type">フックタイプ</string>
+    <string name="home_hook_type_tracepoint">Tracepoint</string>
+    <string name="home_hook_type_susfs_inline">SUSFS Inline</string>
+    <string name="home_hook_type_unknown">旧版 / 不明</string>
+    <string name="home_hook_type_failed">%1$s（異常）</string>
     <string name="home_running_status">動作状態</string>
     <string name="home_state_on">オン</string>
     <string name="home_working_version">バージョン: %s</string>
@@ -274,6 +279,13 @@
     <string name="settings_kernel_umount">モジュールのアンマウント (カーネルレベル)</string>
     <string name="settings_kernel_umount_summary">アプリプロファイルに基づいて、カーネルからモジュールをアンマウントします。</string>
     <string name="settings_finasu_hide">FinaSU Hide</string>
+    <string name="settings_kernel_umount_unknown">機能の利用可能性を確認できません</string>
+    <string name="settings_kernel_umount_values">現在: %1$s · 再起動用に保存されました: %2$s</string>
+    <string name="settings_kernel_umount_on">オン</string>
+    <string name="settings_kernel_umount_off">オフ</string>
+    <string name="settings_kernel_umount_value_unknown">不明または保存されていません</string>
+    <string name="settings_kernel_umount_write_failed">モジュールのアンマウントを変更できませんでした</string>
+    <string name="settings_kernel_umount_save_failed">変更されましたが、再起動のために保存できませんでした</string>
     <string name="umount_paths_title">カスタムアンマウントマウントポイント</string>
     <string name="umount_paths_summary">選択したアプリの起動時に表示しないマウントポイントを管理します</string>
     <string name="umount_paths_intro_title">アプリが実際に参照するファイルを変更します</string>
@@ -378,6 +390,9 @@
     <string name="settings_folk_mount_reboot_hint">再起動後に有効になります。</string>
     <string name="settings_folk_mount_metamodule_compat_hint">有効なメタモジュールが存在します。そのスクリプトは内蔵エンジンでは動作しない可能性があります。</string>
     <string name="settings_folk_mount_nomount_unavailable_hint">NoMount ドライバーが応答していません。今回の起動では内蔵エンジンにフォールバックします。</string>
+    <string name="settings_folk_mount_nomount_ui_fallback">前回の起動では NoMount の UI 準備完了を確認できませんでした。今回の起動では Built-in エンジンを使用します。これは NoMount の不具合を証明するものではありません。</string>
+    <string name="settings_folk_mount_nomount_ui_unconfirmed">NoMount の UI 準備完了を確認できませんでした。次回の起動では Built-in エンジンを使用します。</string>
+    <string name="settings_folk_mount_step_interrupted">前回のマウント手順が完了しませんでした。同じ障害を繰り返さないため、今回の起動ではこの手順を省略しました。</string>
     <string name="settings_folk_mount_write_failed">Folk Mount モードの変更に失敗しました。</string>
     <string name="settings_nomount">NoMount</string>
     <string name="nomount_section_driver">ドライバー</string>
@@ -489,6 +504,8 @@
     <string name="settings_hide_home_mount_summary">ホームの情報カードからモジュールのマウント行を削除します。</string>
     <string name="settings_hide_home_kernel_full_version">カーネルビルドを隠す</string>
     <string name="settings_hide_home_kernel_full_version_summary">ホームの情報カードからカーネルビルドの行を削除します。</string>
+    <string name="settings_hide_home_hook_type">フックタイプを隠す</string>
+    <string name="settings_hide_home_hook_type_summary">ホームの情報カードからフックタイプの行を削除します。</string>
     <string name="settings_category_general">一般</string>
     <string name="settings_category_appearance">外観</string>
     <string name="settings_category_behavior">動作</string>
@@ -656,6 +673,10 @@
     <string name="settings_finasu_hide_failed">FinaSU Hide を変更できませんでした</string>
     <string name="settings_adb_root" translatable="false">ADB Root</string>
     <string name="settings_adb_root_summary">adbd デーモンを Root 権限で実行します</string>
+    <string name="feature_external_changes_title">FinaSU 外部で共有設定が変更されました</string>
+    <string name="feature_external_changes_summary">FinaSU が保存された設定を適用した後、外部モジュールまたはマネージャーがこれらのランタイム値を変更しました。 FinaSU はそれらを自動的に上書きしません。</string>
+    <string name="feature_external_value_on">オン</string>
+    <string name="feature_external_value_off">オフ</string>
     <string name="menu_sort">並べ替え</string>
     <string name="sort_by_name">アプリ名</string>
     <string name="sort_by_package_name">パッケージ名</string>

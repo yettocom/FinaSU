@@ -39,7 +39,7 @@ class SettingsViewModel(
     }
 
     fun refresh() {
-        if (_uiState.value.isFolkZygiskWriting) return
+        if (_uiState.value.isFolkZygiskWriting || _uiState.value.isKernelUmountWriting) return
         val generation = ++refreshGeneration
         _uiState.update { it.copy(isFolkMountLoading = true, isFolkZygiskLoading = true) }
         viewModelScope.launch {
@@ -78,7 +78,9 @@ class SettingsViewModel(
             }
 
             val kernelUmountStatus = repo.getKernelUmountStatus()
-            val isKernelUmountEnabled = repo.isKernelUmountEnabled()
+            val kernelUmountValue = repo.getKernelUmountValue()
+            val kernelUmountPersistValue = repo.getKernelUmountPersistValue()
+            val externalFeatureChanges = repo.getExternalFeatureChanges()
             val selinuxHideStatus = repo.getSelinuxHideStatus()
             val isSelinuxHideEnabled = repo.isSelinuxHideEnabled()
             val mountViewFilterStatus = repo.getMountViewFilterStatus()
@@ -106,6 +108,7 @@ class SettingsViewModel(
             val isDynamicManagerAvailable = Natives.isDynamicManagerEnabled()
             val isLateLoadMode = Natives.isLateLoadMode
             val kernelFullVersionAvailable = Natives.isManager && !Natives.getFullVersion().isNullOrBlank()
+            val hookTypeAvailable = Natives.isManager
 
             val folkMountResult = repo.getFolkMountStatus()
             val nomountResult = repo.getNomountStatus()
@@ -152,6 +155,8 @@ class SettingsViewModel(
                     hideHomeSusfs = repo.hideHomeSusfs,
                     hideHomeMount = repo.hideHomeMount,
                     hideHomeKernelFullVersion = repo.hideHomeKernelFullVersion,
+                    hideHomeHookType = repo.hideHomeHookType,
+                    hookTypeAvailable = hookTypeAvailable,
                     kernelFullVersionAvailable = kernelFullVersionAvailable,
                     susfsDetected = susfsDetected,
                     colorStyle = colorStyle,
@@ -165,7 +170,9 @@ class SettingsViewModel(
                     shellSuAdbOnlyStatus = shellSuAdbOnlyStatus,
                     isShellSuAdbOnlyEnabled = isShellSuAdbOnlyEnabled,
                     kernelUmountStatus = kernelUmountStatus,
-                    isKernelUmountEnabled = isKernelUmountEnabled,
+                    kernelUmountValue = kernelUmountValue,
+                    kernelUmountPersistValue = kernelUmountPersistValue,
+                    externalFeatureChanges = externalFeatureChanges,
                     selinuxHideStatus = selinuxHideStatus,
                     isSelinuxHideEnabled = isSelinuxHideEnabled,
                     mountViewFilterStatus = mountViewFilterStatus,
@@ -445,6 +452,11 @@ class SettingsViewModel(
         _uiState.update { it.copy(hideHomeKernelFullVersion = hidden) }
     }
 
+    fun setHideHomeHookType(hidden: Boolean) {
+        repo.hideHomeHookType = hidden
+        _uiState.update { it.copy(hideHomeHookType = hidden) }
+    }
+
     fun setSuCompatMode(mode: Int) {
         viewModelScope.launch(Dispatchers.IO) {
             when (mode) {
@@ -474,11 +486,34 @@ class SettingsViewModel(
     }
 
     fun setKernelUmountEnabled(enabled: Boolean) {
+        if (_uiState.value.isKernelUmountWriting) return
+        ++refreshGeneration
+        _uiState.update { it.copy(isKernelUmountWriting = true) }
         viewModelScope.launch(Dispatchers.IO) {
-            if (repo.setKernelUmountEnabled(enabled)) {
-                repo.execKsudFeatureSave()
-                _uiState.update { it.copy(isKernelUmountEnabled = enabled) }
+            val changed = repo.setKernelUmountEnabled(enabled)
+            val saved = changed && repo.execKsudFeatureSave()
+            val status = repo.getKernelUmountStatus()
+            val value = repo.getKernelUmountValue()
+            val persistValue = repo.getKernelUmountPersistValue()
+            _uiState.update {
+                it.copy(
+                    kernelUmountStatus = status,
+                    kernelUmountValue = value,
+                    kernelUmountPersistValue = persistValue,
+                    isKernelUmountWriting = false,
+                )
             }
+            if (!changed || !saved) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(
+                        ksuApp,
+                        if (!changed) R.string.settings_kernel_umount_write_failed
+                        else R.string.settings_kernel_umount_save_failed,
+                        Toast.LENGTH_LONG,
+                    ).show()
+                }
+            }
+            withContext(Dispatchers.Main) { refresh() }
         }
     }
 

@@ -97,10 +97,57 @@ class SusfsViewModelTest {
         assertEquals(null, model.state.value.kernelFactsError)
     }
 
+    @Test
+    fun `external ownership rejects save and apply`() = runTest(dispatcher) {
+        repository.statusValue = repository.statusValue.copy(ownership = "external")
+        val model = model()
+        advanceUntilIdle()
+        model.save("{}")
+        model.apply()
+        advanceUntilIdle()
+        assertEquals(0, repository.saved.size)
+        assertEquals(0, repository.applyCalls)
+        assertEquals(0, uts.disableCalls)
+    }
+
+    @Test
+    fun `ownership transition blocks save and apply`() = runTest(dispatcher) {
+        repository.statusValue = repository.statusValue.copy(pendingOwner = "external")
+        val model = model()
+        advanceUntilIdle()
+        model.save("{}")
+        model.apply()
+        advanceUntilIdle()
+        assertEquals(0, repository.saved.size)
+        assertEquals(0, repository.applyCalls)
+    }
+
+    @Test
+    fun `schema one restore requires builtin ownership and a backup`() = runTest(dispatcher) {
+        repository.statusValue = repository.statusValue.copy(
+            ownership = "builtin",
+            schema1BackupAvailable = true,
+        )
+        val model = model()
+        advanceUntilIdle()
+        model.restoreSchema1()
+        advanceUntilIdle()
+        assertEquals(1, repository.restoreCalls)
+
+        repository.statusValue = repository.statusValue.copy(ownership = "external")
+        model.refresh()
+        advanceUntilIdle()
+        model.restoreSchema1()
+        advanceUntilIdle()
+        assertEquals(1, repository.restoreCalls)
+    }
+
     private class FakeSusfs : SusfsDataSource {
-        var statusValue = SusfsStatus(protocol = "compatible")
+        var statusValue = SusfsStatus(protocol = "compatible", ownership = "builtin")
         var blockNextStatus: CompletableDeferred<Unit>? = null
         val saved = mutableListOf<String>()
+        var applyCalls = 0
+        var restoreCalls = 0
 
         override suspend fun status(): SusfsStatus {
             val snapshot = statusValue
@@ -116,8 +163,14 @@ class SusfsViewModelTest {
             saved += text
         }
 
-        override suspend fun apply() =
-            """{"status":"applied","applied":[],"failures":{},"pending_reboot":[]}"""
+        override suspend fun apply(): String {
+            applyCalls++
+            return """{"status":"applied","applied":[],"failures":{},"pending_reboot":[]}"""
+        }
+
+        override suspend fun restoreSchema1() {
+            restoreCalls++
+        }
     }
 
     private class FakeUts : UtsDataSource {

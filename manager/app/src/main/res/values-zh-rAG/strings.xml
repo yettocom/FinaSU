@@ -29,6 +29,11 @@
     <string name="home_metric_storage_swap">交换空间喵</string>
     <string name="home_version">版本喵</string>
     <string name="home_running_mode">运行模式喵</string>
+    <string name="home_hook_type">钩子类型喵</string>
+    <string name="home_hook_type_tracepoint">Tracepoint</string>
+    <string name="home_hook_type_susfs_inline">SUSFS Inline</string>
+    <string name="home_hook_type_unknown">旧版 / 未知喵</string>
+    <string name="home_hook_type_failed">%1$s（异常喵）</string>
     <string name="home_running_status">运行状态喵</string>
     <string name="home_state_on">开着呢喵</string>
     <string name="home_working_version">版本：%s 喵</string>
@@ -274,6 +279,13 @@
     <string name="settings_kernel_umount">卸载模块（内核级）喵</string>
     <string name="settings_kernel_umount_summary">在内核里帮需要的应用卸载模块喵</string>
     <string name="settings_finasu_hide">FinaSU Hide</string>
+    <string name="settings_kernel_umount_unknown">没法确认功能是否可用喵</string>
+    <string name="settings_kernel_umount_values">现在：%1$s · 重启后：%2$s喵</string>
+    <string name="settings_kernel_umount_on">开启喵</string>
+    <string name="settings_kernel_umount_off">关闭喵</string>
+    <string name="settings_kernel_umount_value_unknown">未知或未保存喵</string>
+    <string name="settings_kernel_umount_write_failed">没法修改卸载模块总开关喵</string>
+    <string name="settings_kernel_umount_save_failed">已修改，但没法保存供重启后使用喵</string>
     <string name="umount_paths_title">自定义卸载挂载点喵</string>
     <string name="umount_paths_summary">管理指定 App 启动时看不到的挂载点喵</string>
     <string name="umount_paths_intro_title">改变 App 真正看到的文件喵</string>
@@ -378,6 +390,9 @@
     <string name="settings_folk_mount_reboot_hint">重启后才生效哦喵</string>
     <string name="settings_folk_mount_metamodule_compat_hint">检测到有开着的 metamodule 喵；它的脚本可能跟内建引擎合不来哦</string>
     <string name="settings_folk_mount_nomount_unavailable_hint">NoMount 驱动没回应喵；这次启动会回退到内建引擎哒</string>
+    <string name="settings_folk_mount_nomount_ui_fallback">上次启动没确认 NoMount 界面准备好喵；这次先用 Built-in 引擎啦。这不代表 NoMount 坏掉哦</string>
+    <string name="settings_folk_mount_nomount_ui_unconfirmed">没确认 NoMount 界面准备好喵；下次启动会先用 Built-in 引擎哒</string>
+    <string name="settings_folk_mount_step_interrupted">上次挂载步骤没走完喵；这次先跳过它，免得再踩同一个坑哒</string>
     <string name="settings_folk_mount_write_failed">改 Folk Mount 模式失败啦喵…</string>
     <string name="settings_nomount">NoMount</string>
     <string name="nomount_section_driver">驱动</string>
@@ -498,6 +513,8 @@
     <string name="settings_hide_home_mount_summary">把模块挂载那行藏起来喵～</string>
     <string name="settings_hide_home_kernel_full_version">藏起内核全貌喵</string>
     <string name="settings_hide_home_kernel_full_version_summary">把内核完整版本那行藏起来喵～</string>
+    <string name="settings_hide_home_hook_type">藏起钩子类型喵</string>
+    <string name="settings_hide_home_hook_type_summary">把钩子类型那行藏起来喵～</string>
     <string name="settings_category_general">通用</string>
     <string name="settings_category_appearance">外观</string>
     <string name="settings_category_behavior">行为</string>
@@ -665,6 +682,10 @@
     <string name="settings_finasu_hide_failed">改 FinaSU Hide 失败啦喵…</string>
     <string name="settings_adb_root" translatable="false">ADB Root</string>
     <string name="settings_adb_root_summary">用 Root 权限跑 adbd 守护进程喵</string>
+    <string name="feature_external_changes_title">共享设定已被外部修改喵</string>
+    <string name="feature_external_changes_summary">外部模块或管理器在 FinaSU 应用已保存设定后修改了这些运行值。FinaSU 不会自己覆盖喵。</string>
+    <string name="feature_external_value_on">开启喵</string>
+    <string name="feature_external_value_off">关闭喵</string>
     <string name="menu_sort">排序喵</string>
     <string name="sort_by_name">应用名喵</string>
     <string name="sort_by_package_name">包名喵</string>

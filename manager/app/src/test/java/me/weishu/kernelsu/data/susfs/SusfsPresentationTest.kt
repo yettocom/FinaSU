@@ -5,6 +5,28 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class SusfsPresentationTest {
+    @Test
+    fun validatesStaticKstatFieldRanges() {
+        assertTrue(SusfsInputs.validStaticKstatValue("ino", "1"))
+        assertFalse(SusfsInputs.validStaticKstatValue("ino", "-1"))
+        assertTrue(SusfsInputs.validStaticKstatValue("nlink", "4294967295"))
+        assertFalse(SusfsInputs.validStaticKstatValue("nlink", "4294967296"))
+        assertTrue(SusfsInputs.validStaticKstatValue("ctime_nsec", "999999999"))
+        assertFalse(SusfsInputs.validStaticKstatValue("ctime_nsec", "1000000000"))
+        assertTrue(SusfsInputs.validStaticKstatValue("ctime_sec", "-1"))
+    }
+
+    @Test fun `errors map to stable recovery guidance`() {
+        assertEquals(SusfsErrorKind.Capability, susfsErrorKind("Capability unavailable: CONFIG_X"))
+        assertEquals(SusfsErrorKind.PendingReboot, susfsErrorKind("Static kstat requires an empty rule table"))
+        assertEquals(SusfsErrorKind.Uts, susfsErrorKind("SUSFS uname provider is not active"))
+        assertEquals(SusfsErrorKind.Ownership, susfsErrorKind("SUSFS management is external or switching"))
+        assertEquals(SusfsErrorKind.Timeout, susfsErrorKind("Operation timed out; refresh"))
+        assertEquals(SusfsErrorKind.Validation, susfsErrorKind("Duplicate SUSFS rule"))
+        assertEquals(SusfsErrorKind.Validation, susfsErrorKind("SUSFS returned error -22"))
+        assertEquals(SusfsErrorKind.Unknown, susfsErrorKind("unexpected"))
+    }
+
     @Test fun `receipt separates acknowledgements errors and reboot requests`() {
         val report = SusfsApplyReport.parse("""{"status":"partial","applied":["path:/a"],"failures":{"uname":"SUSFS returned error -22"},"skipped":{"avc_spoof":"Capability unavailable"},"deferred":["cmdline"],"pending_reboot":["kstat:/b"]}""")
         assertEquals(listOf("path:/a"), report.applied)
@@ -44,10 +66,45 @@ class SusfsPresentationTest {
         assertThrows(IllegalArgumentException::class.java) { SusfsInputs.replaceRule(config, original, null) }
         assertEquals(1, config.getJSONArray("rules").length())
     }
+    @Test fun `nested static fields are compared by value`() {
+        val original = """{"kind":"static_kstat","path":"/a","fields":{"size":3}}"""
+        val config = JSONObject("""{"rules":[$original]}""")
+        SusfsInputs.replaceRule(config, original, JSONObject("""{"kind":"static_kstat","path":"/a","fields":{"size":4}}"""))
+        assertEquals(4, config.getJSONArray("rules").getJSONObject(0).getJSONObject("fields").getInt("size"))
+        assertThrows(IllegalArgumentException::class.java) { SusfsInputs.replaceRule(config, original, null) }
+    }
     @Test fun `import preview never implies complete daemon validation`() {
         val json = """{"schema":1,"automatic":true,"settings":{},"rules":[],"lkm":{"hidden_modules":[],"mount_prefixes":[]},"unknown":1}"""
         assertTrue(SusfsInputs.preview(json).getBoolean("automatic"))
-        assertThrows(IllegalArgumentException::class.java) { SusfsInputs.preview(json.replace("\"schema\":1", "\"schema\":2")) }
+        assertEquals(2, SusfsInputs.preview(json.replace("\"schema\":1", "\"schema\":2")).getInt("schema"))
+        assertThrows(IllegalArgumentException::class.java) { SusfsInputs.preview(json.replace("\"schema\":1", "\"schema\":3")) }
         assertThrows(IllegalArgumentException::class.java) { SusfsInputs.preview(" ".repeat(128 * 1024 + 1)) }
+    }
+    @Test fun `batch path rules ignore blanks and preserve shared options`() {
+        val rules = SusfsInputs.batchRules("path", " /a \n\n/b ", looping = true)
+        assertEquals(listOf("/a", "/b"), rules.map { it.getString("path") })
+        assertTrue(rules.all { it.getBoolean("looping") })
+    }
+    @Test fun `batch redirect rules require source destination pairs`() {
+        val rules = SusfsInputs.batchRules("redirect", "/a -> /b\n/c -> /d", uidScheme = 2)
+        assertEquals(listOf("/a", "/c"), rules.map { it.getString("path") })
+        assertEquals(listOf("/b", "/d"), rules.map { it.getString("destination") })
+        assertTrue(rules.all { it.getInt("uid_scheme") == 2 })
+        assertThrows(IllegalArgumentException::class.java) { SusfsInputs.batchRules("redirect", "/a") }
+        assertThrows(IllegalArgumentException::class.java) { SusfsInputs.batchRules("redirect", "a -> /b") }
+        assertThrows(IllegalArgumentException::class.java) { SusfsInputs.batchRules("redirect", "/a -> /a") }
+        val extended = SusfsInputs.batchRules(
+            "redirect", "/a -> /b", uidScheme = 3, uidSchemes = setOf(0, 1, 2, 3, 4),
+        )
+        assertEquals(3, extended.single().getInt("uid_scheme"))
+    }
+    @Test fun `batch additions are atomic and reject duplicates`() {
+        val config = JSONObject("""{"rules":[{"kind":"path","path":"/a"}]}""")
+        SusfsInputs.addRules(config, SusfsInputs.batchRules("path", "/b\n/c"))
+        assertEquals(3, config.getJSONArray("rules").length())
+        assertThrows(IllegalArgumentException::class.java) {
+            SusfsInputs.addRules(config, SusfsInputs.batchRules("path", "/c\n/d"))
+        }
+        assertEquals(3, config.getJSONArray("rules").length())
     }
 }

@@ -85,6 +85,7 @@ class SusfsViewModel(
                         it.copy(
                             status = status,
                             config = config,
+                            pendingUnameApply = it.pendingUnameApply && status.writable,
                             kernelFactsLoading = true,
                             kernelFactsError = null,
                         )
@@ -128,7 +129,7 @@ class SusfsViewModel(
         }
     }
 
-    private fun operation(applying: Boolean = false, block: suspend () -> String) {
+    private fun operation(applying: Boolean = false, saved: Boolean = true, block: suspend () -> String) {
         if (mutable.value.busy) return
         val request = ++token
         val generation = shellGeneration()
@@ -138,7 +139,7 @@ class SusfsViewModel(
                 val result = block()
                 val report = if (applying) SusfsApplyReport.parse(result) else null
                 if (request == token && generation == shellGeneration()) {
-                    mutable.update { it.copy(message = null, report = report ?: it.report, savedNotice = !applying) }
+                    mutable.update { it.copy(message = null, report = report ?: it.report, savedNotice = !applying && saved) }
                 }
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) {
@@ -156,7 +157,7 @@ class SusfsViewModel(
     }
 
     fun save(text: String) {
-        if (!mutable.value.status.detected || mutable.value.status.protocol != "compatible") return
+        if (!mutable.value.status.canImport) return
         startSave { text }
     }
 
@@ -166,7 +167,7 @@ class SusfsViewModel(
     }
 
     fun change(edit: (JSONObject) -> Unit) {
-        if (!mutable.value.status.detected || mutable.value.status.protocol != "compatible") return
+        if (!mutable.value.status.writable) return
         // Read fresh on-disk data rather than writing the screen's stale snapshot. This is not a
         // cross-process transaction: the daemon validates and atomically saves the complete file.
         startSave {
@@ -177,13 +178,34 @@ class SusfsViewModel(
     }
 
     fun confirmPendingUnameApply() {
-        if (!mutable.value.pendingUnameApply || mutable.value.busy) return
+        if (!mutable.value.pendingUnameApply || mutable.value.busy || !mutable.value.status.writable) return
         mutable.update { it.copy(pendingUnameApply = false) }
         operation(applying = true) { applySusfsWithUtsFallback(repository, utsRepository) }
     }
 
     fun dismissPendingUnameApply() {
         mutable.update { it.copy(pendingUnameApply = false) }
+    }
+
+    fun switchOwnership(target: String) {
+        if (target !in setOf("builtin", "external") || mutable.value.busy || mutable.value.pendingUnameApply) return
+        operation(saved = false) { repository.switchOwnership(target); "" }
+    }
+
+    fun confirmOwnership() {
+        if (!mutable.value.status.switchReady || mutable.value.busy) return
+        operation(saved = false) { repository.confirmOwnership(); "" }
+    }
+
+    fun cancelOwnership() {
+        if (mutable.value.status.pendingOwner == null || mutable.value.busy) return
+        operation(saved = false) { repository.cancelOwnership(); "" }
+    }
+
+    fun restoreSchema1() {
+        if (!mutable.value.status.canImport || !mutable.value.status.schema1BackupAvailable ||
+            mutable.value.busy) return
+        operation(saved = false) { repository.restoreSchema1(); "" }
     }
 
     fun message(text: String) { mutable.update { it.copy(message = text) } }

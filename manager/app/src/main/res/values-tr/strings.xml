@@ -29,6 +29,11 @@
     <string name="home_metric_storage_swap">Takas</string>
     <string name="home_version">Sürüm</string>
     <string name="home_running_mode">Çalışma modu</string>
+    <string name="home_hook_type">Hook tipi</string>
+    <string name="home_hook_type_tracepoint">Tracepoint</string>
+    <string name="home_hook_type_susfs_inline">SUSFS Inline</string>
+    <string name="home_hook_type_unknown">Eski sürüm / bilinmiyor</string>
+    <string name="home_hook_type_failed">%1$s (anormal)</string>
     <string name="home_running_status">Çalışma durumu</string>
     <string name="home_state_on">Açık</string>
     <string name="home_working_version">Sürüm: %s</string>
@@ -276,6 +281,13 @@
     <string name="settings_kernel_umount">Kernel bağlantısını kes</string>
     <string name="settings_kernel_umount_summary">KernelSU tarafından kontrol edilen çekirdek seviyesinde bağlantı kesme davranışı.</string>
     <string name="settings_finasu_hide">FinaSU Hide</string>
+    <string name="settings_kernel_umount_unknown">Özelliğin kullanılabilirliği doğrulanamıyor</string>
+    <string name="settings_kernel_umount_values">Şu anki: %1$s · Yeniden başlatma için kaydedildi: %2$s</string>
+    <string name="settings_kernel_umount_on">Açık</string>
+    <string name="settings_kernel_umount_off">Kapalı</string>
+    <string name="settings_kernel_umount_value_unknown">Bilinmiyor veya kaydedilmedi</string>
+    <string name="settings_kernel_umount_write_failed">Modül bağlantısının kesilmesi değiştirilemedi</string>
+    <string name="settings_kernel_umount_save_failed">Değiştirildi ancak yeniden başlatma için kaydedilemedi</string>
     <string name="umount_paths_title">Özel kaldırılacak bağlama noktaları</string>
     <string name="umount_paths_summary">Seçili uygulamaların başlangıçta görmemesi gereken bağlama noktalarını yönetin</string>
     <string name="umount_paths_intro_title">Uygulamanın gerçekte gördüğü dosyaları değiştirir</string>
@@ -380,6 +392,9 @@
     <string name="settings_folk_mount_reboot_hint">Yeniden başlatmadan sonra etkili olur.</string>
     <string name="settings_folk_mount_metamodule_compat_hint">Etkin bir metamodül mevcut; betikleri yerleşik motorla çalışmayabilir.</string>
     <string name="settings_folk_mount_nomount_unavailable_hint">NoMount sürücüsü yanıt vermiyor; bu önyükleme yerleşik motora geri dönüyor.</string>
+    <string name="settings_folk_mount_nomount_ui_fallback">Önceki önyükleme NoMount arayüzünün hazır olduğunu doğrulayamadı; bu önyükleme Built-in motorunu kullanıyor. Bu, NoMount arızası olduğunu kanıtlamaz.</string>
+    <string name="settings_folk_mount_nomount_ui_unconfirmed">NoMount arayüzünün hazır olduğu doğrulanamadı; sonraki önyükleme Built-in motorunu kullanacak.</string>
+    <string name="settings_folk_mount_step_interrupted">Önceki bağlama adımı tamamlanmadı; aynı hatanın yinelenmemesi için bu önyüklemede atlandı.</string>
     <string name="settings_folk_mount_write_failed">Folk Mount modu değiştirilemedi.</string>
     <string name="settings_nomount">NoMount</string>
     <string name="nomount_section_driver">Sürücü</string>
@@ -491,6 +506,8 @@
     <string name="settings_hide_home_mount_summary">Modül bağlama satırını ana sayfa bilgi kartından kaldırır.</string>
     <string name="settings_hide_home_kernel_full_version">Çekirdek derlemesini gizle</string>
     <string name="settings_hide_home_kernel_full_version_summary">Çekirdek derlemesi satırını ana sayfa bilgi kartından kaldırır.</string>
+    <string name="settings_hide_home_hook_type">Hook tipini gizle</string>
+    <string name="settings_hide_home_hook_type_summary">Hook tipi satırını ana sayfa bilgi kartından kaldırır.</string>
     <string name="settings_category_general">Genel</string>
     <string name="settings_category_appearance">Görünüm</string>
     <string name="settings_category_behavior">Davranış</string>
@@ -658,6 +675,10 @@
     <string name="settings_finasu_hide_failed">FinaSU Hide değiştirilemedi</string>
     <string name="settings_adb_root" translatable="false">ADB Root</string>
     <string name="settings_adb_root_summary">adbd daemonını Root ayrıcalıklarıyla çalıştır</string>
+    <string name="feature_external_changes_title">Paylaşılan ayarlar FinaSU dışında değiştirildi</string>
+    <string name="feature_external_changes_summary">FinaSU kayıtlı ayarlarını uyguladıktan sonra harici bir modül veya yönetici bu çalışma zamanı değerlerini değiştirdi. FinaSU otomatik olarak bunların üzerine yazmayacaktır.</string>
+    <string name="feature_external_value_on">Açık</string>
+    <string name="feature_external_value_off">Kapalı</string>
     <string name="menu_sort">Sırala</string>
     <string name="sort_by_name">Uygulama adı</string>
     <string name="sort_by_package_name">Paket adı</string>
