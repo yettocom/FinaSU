@@ -1,5 +1,5 @@
 diff --git a/kernel/Kbuild b/kernel/Kbuild
-index 06538430..9eba0e52 100644
+index f4fa71a6..9f26ab5b 100644
 --- a/kernel/Kbuild
 +++ b/kernel/Kbuild
 @@ -6,6 +6,11 @@ $(error Built-in KernelSU requires CONFIG_KALLSYMS_ALL=y for runtime data symbol
@@ -16,7 +16,7 @@ index 06538430..9eba0e52 100644
  kernelsu-objs += feature/netisolate.o
 diff --git a/kernel/compat/samsung_defex.c b/kernel/compat/samsung_defex.c
 new file mode 100644
-index 00000000..efcd117c
+index 00000000..b4693def
 --- /dev/null
 +++ b/kernel/compat/samsung_defex.c
 @@ -0,0 +1,264 @@
@@ -37,7 +37,7 @@ index 00000000..efcd117c
 + * credential copy and must not observe uid 0 there. 1 is never a valid
 + * application uid.
 + */
-+#define KSU_SAMSUNG_DEFEX_HIDDEN_ID 1u
++#define KSU_DEFEX_HIDDEN_ID 1u
 +
 +typedef void (*defex_get_task_creds_t)(struct task_struct *task, unsigned int *uid, unsigned int *fsuid,
 +                                       unsigned int *egid, unsigned short *cred_flags);
@@ -49,7 +49,7 @@ index 00000000..efcd117c
 +static bool defex_enforce_hooked;
 +static bool defex_user_exec_hooked;
 +
-+/* Set once by ksu_samsung_defex_init(). A device without DEFEX keeps the
++/* Set once by ksu_defex_init(). A device without DEFEX keeps the
 + * standard credential path instead of failing the whole module load.
 + */
 +static bool defex_available;
@@ -66,16 +66,16 @@ index 00000000..efcd117c
 +    u64 start_time;
 +} defex_trusted_task;
 +
-+static bool defex_is_trusted(struct task_struct *task)
++static bool ksu_defex_is_trusted(struct task_struct *task)
 +{
 +    return task && task_pid_nr(task) == defex_trusted_task.pid &&
 +           task->start_time == defex_trusted_task.start_time;
 +}
 +
 +/* True when the task being checked is one DEFEX must not act on. */
-+static bool defex_must_not_enforce(struct task_struct *task)
++static bool ksu_defex_must_not_enforce(struct task_struct *task)
 +{
-+    return defex_is_trusted(task) || (task == current && current_uid().val == 0 && is_ksu_domain());
++    return ksu_defex_is_trusted(task) || (task == current && current_uid().val == 0 && is_ksu_domain());
 +}
 +
 +/*
@@ -84,7 +84,7 @@ index 00000000..efcd117c
 + * task_defex_user_exec, whose signature Samsung does not document - clearing an argument
 + * there could hand the function a NULL it does not expect.
 + */
-+static int __nocfi noinline samsung_defex_allow(void)
++static int __nocfi noinline ksu_defex_allow(void)
 +{
 +    return 0;
 +}
@@ -94,7 +94,7 @@ index 00000000..efcd117c
 + * (paciasp; mov w0, wzr; ...) or the one DFRoot's module leaves behind (bti c; mov x0, #0;
 + * ret).  Probing one of those only adds a trap to every call.
 + */
-+static bool defex_fn_is_noop(const void *fn)
++static bool ksu_defex_fn_is_noop(const void *fn)
 +{
 +    const u32 *insn = fn;
 +
@@ -113,7 +113,7 @@ index 00000000..efcd117c
 +    return false;
 +}
 +
-+static int ksu_samsung_defex_pre_handler(struct kprobe *probe, struct pt_regs *regs)
++static int ksu_defex_pre_handler(struct kprobe *probe, struct pt_regs *regs)
 +{
 +    struct task_struct *task = (struct task_struct *)PT_REGS_PARM1(regs);
 +
@@ -127,21 +127,21 @@ index 00000000..efcd117c
 +     * same trick the user-exec probe below uses, and what diabl0w's DEFEX patch relies on
 +     * (validated on a real device, where it replaces the function for every task).
 +     */
-+    if (defex_must_not_enforce(task)) {
-+        instruction_pointer_set(regs, (unsigned long)samsung_defex_allow);
++    if (ksu_defex_must_not_enforce(task)) {
++        instruction_pointer_set(regs, (unsigned long)ksu_defex_allow);
 +        return 1;
 +    }
 +
 +    return 0;
 +}
 +
-+static int ksu_samsung_defex_user_exec_pre(struct kprobe *probe, struct pt_regs *regs)
++static int ksu_defex_user_exec_pre(struct kprobe *probe, struct pt_regs *regs)
 +{
 +    (void)probe;
 +
 +    /* An exec is always done by the current task, so there is no argument to read. */
-+    if (defex_must_not_enforce(current)) {
-+        instruction_pointer_set(regs, (unsigned long)samsung_defex_allow);
++    if (ksu_defex_must_not_enforce(current)) {
++        instruction_pointer_set(regs, (unsigned long)ksu_defex_allow);
 +        return 1;
 +    }
 +
@@ -150,15 +150,15 @@ index 00000000..efcd117c
 +
 +static struct kprobe defex_enforce_kprobe = {
 +    .symbol_name = "task_defex_enforce",
-+    .pre_handler = ksu_samsung_defex_pre_handler,
++    .pre_handler = ksu_defex_pre_handler,
 +};
 +
 +static struct kprobe defex_user_exec_kprobe = {
 +    .symbol_name = "task_defex_user_exec",
-+    .pre_handler = ksu_samsung_defex_user_exec_pre,
++    .pre_handler = ksu_defex_user_exec_pre,
 +};
 +
-+int ksu_samsung_defex_init(void)
++int ksu_defex_init(void)
 +{
 +    void *enforce_fn;
 +    void *user_exec_fn;
@@ -192,7 +192,7 @@ index 00000000..efcd117c
 +    enforce_fn = (void *)find_kernel_symbol_exact("task_defex_enforce");
 +    if (!enforce_fn) {
 +        pr_info("samsung_defex: enforce hook not present, not probing it\n");
-+    } else if (defex_fn_is_noop(enforce_fn)) {
++    } else if (ksu_defex_fn_is_noop(enforce_fn)) {
 +        pr_info("samsung_defex: enforce hook is already inert, not probing it\n");
 +    } else {
 +        ret = register_kprobe(&defex_enforce_kprobe);
@@ -205,7 +205,7 @@ index 00000000..efcd117c
 +    user_exec_fn = (void *)find_kernel_symbol_exact("task_defex_user_exec");
 +    if (!user_exec_fn) {
 +        pr_info("samsung_defex: user-exec hook not present, not probing it\n");
-+    } else if (defex_fn_is_noop(user_exec_fn)) {
++    } else if (ksu_defex_fn_is_noop(user_exec_fn)) {
 +        pr_info("samsung_defex: user-exec hook is already inert, not probing it\n");
 +    } else {
 +        ret = register_kprobe(&defex_user_exec_kprobe);
@@ -230,7 +230,7 @@ index 00000000..efcd117c
 +    return 0;
 +}
 +
-+void ksu_samsung_defex_exit(void)
++void ksu_defex_exit(void)
 +{
 +    if (defex_user_exec_hooked) {
 +        unregister_kprobe(&defex_user_exec_kprobe);
@@ -248,7 +248,7 @@ index 00000000..efcd117c
 + * failed call.  noinline keeps the module's LTO from folding this back into an instrumented
 + * caller, which would put the check back; this runs on every root escalation.
 + */
-+void __nocfi noinline ksu_samsung_defex_sync_current(void)
++void __nocfi noinline ksu_defex_sync_current(void)
 +{
 +    const struct cred *cred;
 +    unsigned int report_uid;
@@ -271,9 +271,9 @@ index 00000000..efcd117c
 +    defex_get_task_creds(current, &report_uid, &report_fsuid, &report_egid, &cred_flags);
 +
 +    if (__kuid_val(cred->euid) == 0 && __kuid_val(cred->fsuid) == 0 && __kgid_val(cred->egid) == 0) {
-+        report_uid = KSU_SAMSUNG_DEFEX_HIDDEN_ID;
-+        report_fsuid = KSU_SAMSUNG_DEFEX_HIDDEN_ID;
-+        report_egid = KSU_SAMSUNG_DEFEX_HIDDEN_ID;
++        report_uid = KSU_DEFEX_HIDDEN_ID;
++        report_fsuid = KSU_DEFEX_HIDDEN_ID;
++        report_egid = KSU_DEFEX_HIDDEN_ID;
 +    } else {
 +        report_uid = __kuid_val(cred->euid);
 +        report_fsuid = __kuid_val(cred->fsuid);
@@ -286,21 +286,21 @@ index 00000000..efcd117c
 +}
 diff --git a/kernel/compat/samsung_defex.h b/kernel/compat/samsung_defex.h
 new file mode 100644
-index 00000000..410805e9
+index 00000000..54d76735
 --- /dev/null
 +++ b/kernel/compat/samsung_defex.h
 @@ -0,0 +1,8 @@
-+#ifndef __KSU_H_SAMSUNG_DEFEX
-+#define __KSU_H_SAMSUNG_DEFEX
++#ifndef __KSU_SAMSUNG_DEFEX_H
++#define __KSU_SAMSUNG_DEFEX_H
 +
-+int ksu_samsung_defex_init(void);
-+void ksu_samsung_defex_exit(void);
-+void ksu_samsung_defex_sync_current(void);
++int ksu_defex_init(void);
++void ksu_defex_exit(void);
++void ksu_defex_sync_current(void);
 +
 +#endif
 diff --git a/kernel/compat/samsung_kdp.c b/kernel/compat/samsung_kdp.c
 new file mode 100644
-index 00000000..d197a7d8
+index 00000000..c464b41d
 --- /dev/null
 +++ b/kernel/compat/samsung_kdp.c
 @@ -0,0 +1,355 @@
@@ -323,8 +323,8 @@ index 00000000..d197a7d8
 +#include "ksu_samsung_kdp.h"
 +#include "klog.h"
 +
-+enum samsung_kdp_cred_command {
-+    KSU_SAMSUNG_KDP_COPY_CREDS = 0,
++enum ksu_kdp_cred_command {
++    KSU_KDP_COPY_CREDS = 0,
 +};
 +
 +typedef struct cred *(*prepare_ro_creds_t)(struct cred *cred, int command, u64 task);
@@ -344,7 +344,7 @@ index 00000000..d197a7d8
 +typedef __typeof__(&dec_rlimit_ucounts) dec_rlimit_ucounts_t;
 +#endif
 +
-+struct samsung_kdp_commit_work {
++struct ksu_kdp_commit_work {
 +    struct work_struct work;
 +    struct completion completion;
 +    struct task_struct *target;
@@ -358,7 +358,7 @@ index 00000000..d197a7d8
 +static kdp_usecount_inc_t kdp_usecount_inc_fn;
 +static kdp_set_cred_non_rcu_t kdp_set_cred_non_rcu_fn;
 +/* The rest of what commit_creds() does around the pointer swap.  Optional: a kernel without
-+ * them keeps the KDP path and skips that part (see ksu_samsung_kdp_init()).
++ * them keeps the KDP path and skips that part (see ksu_kdp_init()).
 + */
 +static set_dumpable_t set_dumpable_fn;
 +static key_fsuid_changed_t key_fsuid_changed_fn;
@@ -374,7 +374,7 @@ index 00000000..d197a7d8
 +static dec_rlimit_ucounts_t dec_rlimit_ucounts_fn;
 +#endif
 +
-+/* Set once by ksu_samsung_kdp_init(). A device without the KDP helpers keeps
++/* Set once by ksu_kdp_init(). A device without the KDP helpers keeps
 + * the standard credential path instead of failing the whole module load.
 + */
 +static bool kdp_available;
@@ -385,8 +385,8 @@ index 00000000..d197a7d8
 + * outlive the callback: a stack object would end with the caller's frame, which is exactly what
 + * complete() wakes up, so one static item plus this lock serialize the whole commit instead.
 + */
-+static DEFINE_MUTEX(ksu_samsung_kdp_commit_lock);
-+static struct samsung_kdp_commit_work ksu_samsung_kdp_commit_work;
++static DEFINE_MUTEX(ksu_kdp_commit_lock);
++static struct ksu_kdp_commit_work ksu_kdp_commit_work;
 +
 +/*
 + * Resolve one of the KDP helpers.  The exact lookup goes first: the variant scan accepts any
@@ -394,7 +394,7 @@ index 00000000..d197a7d8
 + * is not a function entry.  It is only a fallback, for the case where the plain name is gone -
 + * an LTO-suffixed local, or a symbol that survives only as its .cfi_jt trampoline.
 + */
-+static void *samsung_kdp_symbol(const char *name)
++static void *ksu_kdp_symbol(const char *name)
 +{
 +    void *addr = (void *)find_kernel_symbol_exact(name);
 +
@@ -404,15 +404,15 @@ index 00000000..d197a7d8
 +    return addr;
 +}
 +
-+static void samsung_kdp_commit_done(struct samsung_kdp_commit_work *commit_work, int result)
++static void ksu_kdp_commit_done(struct ksu_kdp_commit_work *commit_work, int result)
 +{
 +    commit_work->result = result;
 +    complete(&commit_work->completion);
 +}
 +
-+static void __nocfi samsung_kdp_commit_worker(struct work_struct *work)
++static void __nocfi ksu_kdp_commit_worker(struct work_struct *work)
 +{
-+    struct samsung_kdp_commit_work *commit_work = container_of(work, struct samsung_kdp_commit_work, work);
++    struct ksu_kdp_commit_work *commit_work = container_of(work, struct ksu_kdp_commit_work, work);
 +    struct task_struct *target = commit_work->target;
 +    const struct cred *old_cred = commit_work->old_cred;
 +    const struct cred *target_cred;
@@ -431,14 +431,14 @@ index 00000000..d197a7d8
 +        /* The caller frees rw_cred as soon as it reads the result; the static work object must
 +         * not keep pointing at it. */
 +        commit_work->rw_cred = NULL;
-+        samsung_kdp_commit_done(commit_work, -EBUSY);
++        ksu_kdp_commit_done(commit_work, -EBUSY);
 +        return;
 +    }
 +
-+    ro_cred = prepare_ro_creds_fn(commit_work->rw_cred, KSU_SAMSUNG_KDP_COPY_CREDS, (u64)target);
++    ro_cred = prepare_ro_creds_fn(commit_work->rw_cred, KSU_KDP_COPY_CREDS, (u64)target);
 +    if (!ro_cred) {
 +        commit_work->rw_cred = NULL;
-+        samsung_kdp_commit_done(commit_work, -EIO);
++        ksu_kdp_commit_done(commit_work, -EIO);
 +        return;
 +    }
 +
@@ -459,7 +459,7 @@ index 00000000..d197a7d8
 +     * commit_creds() takes a second reference here - "we will require a ref for the subj creds
 +     * too" - because the two slots below are released separately by exit_creds(), so one
 +     * reference would be put twice.  On a KDP credential that reference has to come from
-+     * Samsung's own counter, the one ksu_samsung_kdp_put_cred() decrements: taking it with the
++     * Samsung's own counter, the one ksu_kdp_put_cred() decrements: taking it with the
 +     * inline get_cred() would leave the two implementations disagreeing about one credential.
 +     *
 +     * get_cred() is not just the increment:
@@ -519,14 +519,14 @@ index 00000000..d197a7d8
 +    pr_info("samsung_kdp: task-scoped credential install pid=%d uid=%u euid=%u\n", task_pid_nr(target),
 +            __kuid_val(ro_cred->uid), __kuid_val(ro_cred->euid));
 +
-+    samsung_kdp_commit_done(commit_work, 0);
++    ksu_kdp_commit_done(commit_work, 0);
 +}
 +
 +/* The call below goes through an address resolved from kallsyms: __nocfi skips the kCFI type
 + * check there, and noinline keeps the module's LTO from folding this back into an instrumented
 + * caller, which would put the check back.
 + */
-+void __nocfi noinline ksu_samsung_kdp_put_cred(const struct cred *cred)
++void __nocfi noinline ksu_kdp_put_cred(const struct cred *cred)
 +{
 +    struct cred *mutable_cred = (struct cred *)cred;
 +
@@ -555,30 +555,30 @@ index 00000000..d197a7d8
 +        __put_cred(mutable_cred);
 +}
 +
-+int ksu_samsung_kdp_init(void)
++int ksu_kdp_init(void)
 +{
-+    prepare_ro_creds_fn = (prepare_ro_creds_t)samsung_kdp_symbol("prepare_ro_creds");
-+    kdp_assign_pgd_fn = (kdp_assign_pgd_t)samsung_kdp_symbol("kdp_assign_pgd");
++    prepare_ro_creds_fn = (prepare_ro_creds_t)ksu_kdp_symbol("prepare_ro_creds");
++    kdp_assign_pgd_fn = (kdp_assign_pgd_t)ksu_kdp_symbol("kdp_assign_pgd");
 +    if (!prepare_ro_creds_fn || !kdp_assign_pgd_fn) {
 +        pr_info("samsung_kdp: not present, using the standard credential path\n");
 +        return 0;
 +    }
 +#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 12, 0)
-+    kdp_usecount_sub_and_test_fn = (kdp_usecount_sub_and_test_t)samsung_kdp_symbol("kdp_usecount_sub_and_test");
++    kdp_usecount_sub_and_test_fn = (kdp_usecount_sub_and_test_t)ksu_kdp_symbol("kdp_usecount_sub_and_test");
 +    if (!kdp_usecount_sub_and_test_fn) {
 +        pr_info("samsung_kdp: not present, using the standard credential path\n");
 +        return 0;
 +    }
 +#else
-+    kdp_usecount_dec_and_test_fn = (kdp_usecount_dec_and_test_t)samsung_kdp_symbol("kdp_usecount_dec_and_test");
++    kdp_usecount_dec_and_test_fn = (kdp_usecount_dec_and_test_t)ksu_kdp_symbol("kdp_usecount_dec_and_test");
 +    if (!kdp_usecount_dec_and_test_fn) {
 +        pr_info("samsung_kdp: not present, using the standard credential path\n");
 +        return 0;
 +    }
 +#endif
 +#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 14, 0)
-+    inc_rlimit_ucounts_fn = (inc_rlimit_ucounts_t)samsung_kdp_symbol("inc_rlimit_ucounts");
-+    dec_rlimit_ucounts_fn = (dec_rlimit_ucounts_t)samsung_kdp_symbol("dec_rlimit_ucounts");
++    inc_rlimit_ucounts_fn = (inc_rlimit_ucounts_t)ksu_kdp_symbol("inc_rlimit_ucounts");
++    dec_rlimit_ucounts_fn = (dec_rlimit_ucounts_t)ksu_kdp_symbol("dec_rlimit_ucounts");
 +    if (!inc_rlimit_ucounts_fn || !dec_rlimit_ucounts_fn) {
 +        pr_info("samsung_kdp: not present, using the standard credential path\n");
 +        return 0;
@@ -587,9 +587,9 @@ index 00000000..d197a7d8
 +
 +    /* The increment is required, and grouped with the decrement above: Samsung's <linux/cred.h>
 +     * answers both fields together, and the worker below must be able to take the second
-+     * reference through the same counter ksu_samsung_kdp_put_cred() decrements.
++     * reference through the same counter ksu_kdp_put_cred() decrements.
 +     */
-+    kdp_usecount_inc_fn = (kdp_usecount_inc_t)samsung_kdp_symbol("kdp_usecount_inc");
++    kdp_usecount_inc_fn = (kdp_usecount_inc_t)ksu_kdp_symbol("kdp_usecount_inc");
 +    if (!kdp_usecount_inc_fn) {
 +        pr_info("samsung_kdp: not present, using the standard credential path\n");
 +        return 0;
@@ -598,7 +598,7 @@ index 00000000..d197a7d8
 +    /* Optional, and only a lifetime hint: without it the second reference above is taken
 +     * without clearing non_rcu, which is the pre-5.13 behaviour of that helper.
 +     */
-+    kdp_set_cred_non_rcu_fn = (kdp_set_cred_non_rcu_t)samsung_kdp_symbol("kdp_set_cred_non_rcu");
++    kdp_set_cred_non_rcu_fn = (kdp_set_cred_non_rcu_t)ksu_kdp_symbol("kdp_set_cred_non_rcu");
 +    if (!kdp_set_cred_non_rcu_fn)
 +        pr_warn("samsung_kdp: kdp_set_cred_non_rcu missing, the second cred reference skips the non_rcu clear\n");
 +
@@ -606,10 +606,10 @@ index 00000000..d197a7d8
 +     * them keeps the KDP path and skips that part of the commit rather than losing KDP - the
 +     * plain credential path is the one that is not usable on new firmware.
 +     */
-+    set_dumpable_fn = (set_dumpable_t)samsung_kdp_symbol("set_dumpable");
-+    suid_dumpable_ptr = (int *)samsung_kdp_symbol("suid_dumpable");
-+    key_fsuid_changed_fn = (key_fsuid_changed_t)samsung_kdp_symbol("key_fsuid_changed");
-+    key_fsgid_changed_fn = (key_fsgid_changed_t)samsung_kdp_symbol("key_fsgid_changed");
++    set_dumpable_fn = (set_dumpable_t)ksu_kdp_symbol("set_dumpable");
++    suid_dumpable_ptr = (int *)ksu_kdp_symbol("suid_dumpable");
++    key_fsuid_changed_fn = (key_fsuid_changed_t)ksu_kdp_symbol("key_fsuid_changed");
++    key_fsgid_changed_fn = (key_fsgid_changed_t)ksu_kdp_symbol("key_fsgid_changed");
 +    if (!set_dumpable_fn || !suid_dumpable_ptr || !key_fsuid_changed_fn || !key_fsgid_changed_fn)
 +        pr_warn("samsung_kdp: dumpability/keyring helpers incomplete, that part of the commit is skipped\n");
 +
@@ -621,9 +621,9 @@ index 00000000..d197a7d8
 +    return 0;
 +}
 +
-+int ksu_samsung_kdp_commit_creds(struct cred *cred)
++int ksu_kdp_commit_creds(struct cred *cred)
 +{
-+    struct samsung_kdp_commit_work *commit_work = &ksu_samsung_kdp_commit_work;
++    struct ksu_kdp_commit_work *commit_work = &ksu_kdp_commit_work;
 +    bool queued;
 +    int ret;
 +
@@ -633,8 +633,8 @@ index 00000000..d197a7d8
 +    if (unlikely(!smp_load_acquire(&kdp_available)))
 +        return commit_creds(cred);
 +
-+    mutex_lock(&ksu_samsung_kdp_commit_lock);
-+    INIT_WORK(&commit_work->work, samsung_kdp_commit_worker);
++    mutex_lock(&ksu_kdp_commit_lock);
++    INIT_WORK(&commit_work->work, ksu_kdp_commit_worker);
 +    init_completion(&commit_work->completion);
 +    commit_work->target = current;
 +    commit_work->old_cred = current_real_cred();
@@ -645,7 +645,7 @@ index 00000000..d197a7d8
 +    queued = schedule_work(&commit_work->work);
 +    if (!queued) {
 +        put_task_struct(commit_work->target);
-+        mutex_unlock(&ksu_samsung_kdp_commit_lock);
++        mutex_unlock(&ksu_kdp_commit_lock);
 +        return -EBUSY;
 +    }
 +
@@ -656,15 +656,15 @@ index 00000000..d197a7d8
 +    flush_work(&commit_work->work);
 +    put_task_struct(commit_work->target);
 +    ret = commit_work->result;
-+    mutex_unlock(&ksu_samsung_kdp_commit_lock);
++    mutex_unlock(&ksu_kdp_commit_lock);
 +    return ret;
 +}
 diff --git a/kernel/compat/samsung_rkp.c b/kernel/compat/samsung_rkp.c
 new file mode 100644
-index 00000000..68d8d1b3
+index 00000000..bf4cb1b9
 --- /dev/null
 +++ b/kernel/compat/samsung_rkp.c
-@@ -0,0 +1,631 @@
+@@ -0,0 +1,641 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +/*
 + * Samsung RKP-aware function replacement.
@@ -704,7 +704,7 @@ index 00000000..68d8d1b3
 +#define ksu_rkp_free(p) vfree(p)
 +#endif
 +
-+#define KSU_SAMSUNG_RKP_MAX_SITES 16
++#define KSU_RKP_MAX_SITES 16
 +
 +/*
 + * One stub is 16 bytes, entry at +4:
@@ -715,13 +715,13 @@ index 00000000..68d8d1b3
 + *   [8] the instruction the branch displaced, re-executed before returning to the function
 + *  [12] B back to the first instruction after the displaced one
 + */
-+#define KSU_SAMSUNG_RKP_STUB_SIZE 16
-+#define KSU_SAMSUNG_RKP_STUBS_PER_PAGE (PAGE_SIZE / KSU_SAMSUNG_RKP_STUB_SIZE)
++#define KSU_RKP_STUB_SIZE 16
++#define KSU_RKP_STUBS_PER_PAGE (PAGE_SIZE / KSU_RKP_STUB_SIZE)
 +
-+#define KSU_SAMSUNG_RKP_INSN_BTI_C 0xD503245Fu
-+#define KSU_SAMSUNG_RKP_INSN_PACIASP 0xD503233Fu
-+#define KSU_SAMSUNG_RKP_INSN_PACIBSP 0xD503237Fu
-+#define KSU_SAMSUNG_RKP_INSN_B_OPC 0x14000000u
++#define KSU_RKP_INSN_BTI_C 0xD503245Fu
++#define KSU_RKP_INSN_PACIASP 0xD503233Fu
++#define KSU_RKP_INSN_PACIBSP 0xD503237Fu
++#define KSU_RKP_INSN_B_OPC 0x14000000u
 +
 +typedef int (*ksu_rkp_insn_patch_t)(void *addrs[], u32 insns[], int cnt);
 +
@@ -734,13 +734,13 @@ index 00000000..68d8d1b3
 +};
 +
 +static ksu_rkp_insn_patch_t ksu_rkp_insn_patch;
-+static struct ksu_rkp_site ksu_rkp_sites[KSU_SAMSUNG_RKP_MAX_SITES];
++static struct ksu_rkp_site ksu_rkp_sites[KSU_RKP_MAX_SITES];
 +static unsigned int ksu_rkp_site_count;
 +static DEFINE_MUTEX(ksu_rkp_site_lock);
 +static void *ksu_rkp_stub_page;
 +static unsigned int ksu_rkp_stub_next;
 +/* Slots a restore handed back, reused only after a drain (see ksu_rkp_alloc_stub()). */
-+static unsigned int ksu_rkp_stub_free[KSU_SAMSUNG_RKP_MAX_SITES];
++static unsigned int ksu_rkp_stub_free[KSU_RKP_MAX_SITES];
 +static unsigned int ksu_rkp_stub_free_count;
 +/* synchronize_rcu_tasks() is not exported to modules, so it is resolved by name - the same
 + * reason susfs resolves it.  Without it no stub is recycled and the page is never freed.
@@ -750,11 +750,11 @@ index 00000000..68d8d1b3
 + * would treat its first word as an instruction.  Optional - without it the check is skipped.
 + */
 +static bool (*ksu_rkp_kernel_text)(unsigned long addr);
-+static bool ksu_rkp_active;
++static bool ksu_rkp_installed;
 +
-+bool ksu_samsung_rkp_active(void)
++bool ksu_rkp_active(void)
 +{
-+    return READ_ONCE(ksu_rkp_active);
++    return READ_ONCE(ksu_rkp_installed);
 +}
 +
 +/* A B instruction, or 0 when @to is out of the +/-128 MB a B can reach. */
@@ -768,12 +768,12 @@ index 00000000..68d8d1b3
 +    if (imm26 < -(1LL << 25) || imm26 > (1LL << 25) - 1)
 +        return 0;
 +
-+    return KSU_SAMSUNG_RKP_INSN_B_OPC | ((u32)imm26 & 0x3FFFFFFu);
++    return KSU_RKP_INSN_B_OPC | ((u32)imm26 & 0x3FFFFFFu);
 +}
 +
 +static bool ksu_rkp_is_pac_signing(u32 insn)
 +{
-+    return insn == KSU_SAMSUNG_RKP_INSN_PACIASP || insn == KSU_SAMSUNG_RKP_INSN_PACIBSP;
++    return insn == KSU_RKP_INSN_PACIASP || insn == KSU_RKP_INSN_PACIBSP;
 +}
 +
 +/* BTI variants are bits[31:8] = 0xD50324 with an even op2 and bits[4:0] = 0x1F; the PAC
@@ -859,7 +859,14 @@ index 00000000..68d8d1b3
 +    /* The kCFI type hash lives immediately before the function entry, so this depends on those
 +     * four bytes being readable; every target here is a syscall, an ops callback or a security
 +     * hook, all of which have code (or that hash) in front of them. */
-+    memcpy(&insns[0], (u8 *)fn - sizeof(u32), sizeof(insns[0]));
++    /* The word before the entry is the kCFI type hash only when CFI is compiled in;
++     * otherwise it is instruction bytes (or unmapped, for a function at a page start), and
++     * nothing consults it - every caller is __nocfi.  A landing pad is the safe filler.
++     */
++    if (IS_ENABLED(CONFIG_CFI_CLANG) && ((unsigned long)fn & (PAGE_SIZE - 1)) >= sizeof(u32))
++        memcpy(&insns[0], (u8 *)fn - sizeof(u32), sizeof(insns[0]));
++    else
++        insns[0] = KSU_RKP_INSN_BTI_C;
 +    insns[1] = landing;
 +    insns[2] = displaced;
 +    insns[3] = b_resume;
@@ -911,6 +918,9 @@ index 00000000..68d8d1b3
 + * stub is ever seen jumping into a recycled slot, stop recycling instead of weakening this.
 + *
 + * A slot is consumed as soon as its stub is filled, not when the branch lands: a patch that then
++ *
++ * Runs with ksu_rkp_site_lock held and may sleep for a full RCU tasks grace period, so this
++ * path must never be reached from atomic context.
 + * fails leaves the stub describing the original, and because the slot is never handed out again a
 + * caller that already took its address keeps calling the original rather than somebody else's
 + * displaced instruction.
@@ -923,7 +933,7 @@ index 00000000..68d8d1b3
 +        return 0;
 +    }
 +
-+    if (ksu_rkp_stub_next >= KSU_SAMSUNG_RKP_STUBS_PER_PAGE)
++    if (ksu_rkp_stub_next >= KSU_RKP_STUBS_PER_PAGE)
 +        return -ENOMEM;
 +
 +    *idx = ksu_rkp_stub_next++;
@@ -947,7 +957,7 @@ index 00000000..68d8d1b3
 + * them here is what lets patch_memory.c forward an 8-byte slot write without knowing anything
 + * else about the caller.
 + */
-+int ksu_samsung_rkp_branch_patch_callthru(void *dst, void *src, void **callthru)
++int ksu_rkp_branch_patch_callthru(void *dst, void *src, void **callthru)
 +{
 +    void *fn;
 +    void *new_fn;
@@ -963,7 +973,7 @@ index 00000000..68d8d1b3
 +    unsigned int stub_idx;
 +    int ret;
 +
-+    if (!ksu_rkp_active || !dst || !src)
++    if (!ksu_rkp_installed || !dst || !src)
 +        return -EOPNOTSUPP;
 +
 +    fn = *(void **)dst;
@@ -974,7 +984,7 @@ index 00000000..68d8d1b3
 +    /* ksu_patch_text() forwards any 8-byte write here, so the slot's target is only known at
 +     * run time.  A data address would be read as a function pointer and then patched as if its
 +     * first word were an instruction.  kernel_text_address() is the kernel's own predicate for
-+     * this and is resolved optionally (see ksu_samsung_rkp_init()).
++     * this and is resolved optionally (see ksu_rkp_init()).
 +     */
 +    if (ksu_rkp_kernel_text && !ksu_rkp_kernel_text((unsigned long)fn)) {
 +        pr_err("samsung_rkp: %pS is not kernel text, not installing\n", fn);
@@ -983,11 +993,11 @@ index 00000000..68d8d1b3
 +
 +    mutex_lock(&ksu_rkp_site_lock);
 +
-+    /* ksu_samsung_rkp_exit() frees the page and then clears the flag, both under this lock, so
++    /* ksu_rkp_exit() frees the page and then clears the flag, both under this lock, so
 +     * a caller that passed the unlocked check above has to look again: it would otherwise
 +     * publish a stub pointer into a page that is already gone.
 +     */
-+    if (!ksu_rkp_active) {
++    if (!ksu_rkp_installed) {
 +        mutex_unlock(&ksu_rkp_site_lock);
 +        return -EOPNOTSUPP;
 +    }
@@ -1020,7 +1030,7 @@ index 00000000..68d8d1b3
 +        return 0;
 +    }
 +
-+    if (ksu_rkp_site_count >= KSU_SAMSUNG_RKP_MAX_SITES) {
++    if (ksu_rkp_site_count >= KSU_RKP_MAX_SITES) {
 +        mutex_unlock(&ksu_rkp_site_lock);
 +        pr_err("samsung_rkp: branch site table is full\n");
 +        return -ENOMEM;
@@ -1071,7 +1081,7 @@ index 00000000..68d8d1b3
 +    /* PACIASP/PACIBSP at fn+0 signs LR in place.  Left there, it would sign before the
 +     * branch, and a replacement that signs again in its own entry makes AUTXSP fail at its
 +     * epilogue - a fatal FPAC exception.  BTI C keeps the landing pad without signing. */
-+    landing = KSU_SAMSUNG_RKP_INSN_BTI_C;
++    landing = KSU_RKP_INSN_BTI_C;
 +    if (preamble_skip > 0 && ksu_rkp_is_pac_signing(fn0_insn))
 +        landing = fn0_insn;
 +
@@ -1083,7 +1093,7 @@ index 00000000..68d8d1b3
 +        return -ERANGE;
 +    }
 +
-+    stub = (u8 *)ksu_rkp_stub_page + stub_idx * KSU_SAMSUNG_RKP_STUB_SIZE;
++    stub = (u8 *)ksu_rkp_stub_page + stub_idx * KSU_RKP_STUB_SIZE;
 +    ret = ksu_rkp_fill_stub(stub, fn, resume, displaced, landing);
 +    if (ret) {
 +        ksu_rkp_free_stub(stub_idx);
@@ -1109,7 +1119,7 @@ index 00000000..68d8d1b3
 +     * lose the landing pad or branch from a signed frame. */
 +    if (landing == fn0_insn && fn0_insn) {
 +        void *addrs[2] = { fn, patch_addr };
-+        u32 insns[2] = { KSU_SAMSUNG_RKP_INSN_BTI_C, branch };
++        u32 insns[2] = { KSU_RKP_INSN_BTI_C, branch };
 +
 +        ret = ksu_rkp_insn_patch(addrs, insns, 2);
 +    } else {
@@ -1156,36 +1166,36 @@ index 00000000..68d8d1b3
 +    return 0;
 +}
 +
-+int ksu_samsung_rkp_branch_patch(void *dst, void *src)
++int ksu_rkp_branch_patch(void *dst, void *src)
 +{
-+    return ksu_samsung_rkp_branch_patch_callthru(dst, src, NULL);
++    return ksu_rkp_branch_patch_callthru(dst, src, NULL);
 +}
 +
-+void *ksu_samsung_rkp_get_stub(void *fn)
++void *ksu_rkp_get_stub(void *fn)
 +{
 +    struct ksu_rkp_site *site;
 +    void *stub = NULL;
 +
-+    if (!ksu_rkp_active || !fn)
++    if (!ksu_rkp_installed || !fn)
 +        return NULL;
 +
 +    mutex_lock(&ksu_rkp_site_lock);
 +    /* The page is freed under this lock once the flag is down, so both have to be re-checked
 +     * here: the boss check above runs without it.
 +     */
-+    if (!ksu_rkp_active || !ksu_rkp_stub_page) {
++    if (!ksu_rkp_installed || !ksu_rkp_stub_page) {
 +        mutex_unlock(&ksu_rkp_site_lock);
 +        return NULL;
 +    }
 +    site = ksu_rkp_find_site(fn);
 +    if (site)
-+        stub = (u8 *)ksu_rkp_stub_page + site->stub_idx * KSU_SAMSUNG_RKP_STUB_SIZE + 4;
++        stub = (u8 *)ksu_rkp_stub_page + site->stub_idx * KSU_RKP_STUB_SIZE + 4;
 +    mutex_unlock(&ksu_rkp_site_lock);
 +
 +    return stub;
 +}
 +
-+void ksu_samsung_rkp_init(void)
++void ksu_rkp_init(void)
 +{
 +    ksu_rkp_insn_patch = (ksu_rkp_insn_patch_t)ksu_resolve_symbol_for_functable_hook("aarch64_insn_patch_text");
 +
@@ -1206,18 +1216,18 @@ index 00000000..68d8d1b3
 +        pr_info("samsung_rkp: synchronize_rcu_tasks not reachable, stub slots are not recycled\n");
 +
 +    /* Optional: it is what keeps an 8-byte slot write from being treated as a function when the
-+     * slot really holds data (see ksu_samsung_rkp_branch_patch_callthru()).
++     * slot really holds data (see ksu_rkp_branch_patch_callthru()).
 +     */
 +    ksu_rkp_kernel_text =
 +        (bool (*)(unsigned long))ksu_resolve_symbol_for_functable_hook("kernel_text_address");
 +    if (!ksu_rkp_kernel_text)
 +        pr_info("samsung_rkp: kernel_text_address not reachable, slot targets are not checked\n");
 +
-+    WRITE_ONCE(ksu_rkp_active, true);
++    WRITE_ONCE(ksu_rkp_installed, true);
 +    pr_info("samsung_rkp: RKP detected, function slots are served by branch patching\n");
 +}
 +
-+void ksu_samsung_rkp_exit(void)
++void ksu_rkp_exit(void)
 +{
 +    struct ksu_rkp_site *site;
 +    bool restored = true;
@@ -1261,43 +1271,43 @@ index 00000000..68d8d1b3
 +        pr_err("samsung_rkp: a branch is still installed, keeping the stub page\n");
 +    }
 +
-+    WRITE_ONCE(ksu_rkp_active, false);
++    WRITE_ONCE(ksu_rkp_installed, false);
 +    mutex_unlock(&ksu_rkp_site_lock);
 +}
 +
 +#else /* !__aarch64__ */
 +
-+bool ksu_samsung_rkp_active(void)
++bool ksu_rkp_active(void)
 +{
 +    return false;
 +}
 +
-+int ksu_samsung_rkp_branch_patch(void *dst, void *src)
++int ksu_rkp_branch_patch(void *dst, void *src)
 +{
 +    return -EOPNOTSUPP;
 +}
 +
-+int ksu_samsung_rkp_branch_patch_callthru(void *dst, void *src, void **callthru)
++int ksu_rkp_branch_patch_callthru(void *dst, void *src, void **callthru)
 +{
 +    return -EOPNOTSUPP;
 +}
 +
-+void *ksu_samsung_rkp_get_stub(void *fn)
++void *ksu_rkp_get_stub(void *fn)
 +{
 +    return NULL;
 +}
 +
-+void ksu_samsung_rkp_init(void)
++void ksu_rkp_init(void)
 +{
 +}
 +
-+void ksu_samsung_rkp_exit(void)
++void ksu_rkp_exit(void)
 +{
 +}
 +
 +#endif /* __aarch64__ */
 diff --git a/kernel/core/init.c b/kernel/core/init.c
-index ee0ce665..05425f49 100644
+index c6c1e41e..dd0bf592 100644
 --- a/kernel/core/init.c
 +++ b/kernel/core/init.c
 @@ -12,6 +12,8 @@
@@ -1309,7 +1319,7 @@ index ee0ce665..05425f49 100644
  #include "policy/app_profile.h"
  #include "policy/feature.h"
  #include "feature/module_blacklist.h"
-@@ -38,6 +40,7 @@
+@@ -43,6 +45,7 @@
  #include "feature/mount_view_filter.h"
  #include "infra/symbol_resolver.h"
  #include "preinit/preinit.h"
@@ -1317,16 +1327,7 @@ index ee0ce665..05425f49 100644
  
  #if defined(__x86_64__) && !defined(CONFIG_KSU_X86_PATCH_SYSCALL_DISPATCHER)
  #include <asm/cpufeature.h>
-@@ -102,6 +105,8 @@ module_param_named(bundled, ksu_bundled, bool, 0);
- 
- int __init kernelsu_init(void)
- {
-+    int ret;
-+
- #if defined(__x86_64__) && !defined(CONFIG_KSU_X86_PATCH_SYSCALL_DISPATCHER)
-     // If the kernel has the hardening patch, X86_FEATURE_INDIRECT_SAFE must be set
-     if (!boot_cpu_has(X86_FEATURE_INDIRECT_SAFE)) {
-@@ -139,6 +144,21 @@ int __init kernelsu_init(void)
+@@ -147,6 +150,21 @@ int __init kernelsu_init(void)
  
      pr_info("KernelSU version: %s\n", KSU_VERSION_FULL);
  
@@ -1337,9 +1338,9 @@ index ee0ce665..05425f49 100644
 +     * syscall table write has to go through a branch stub.
 +     */
 +    ksu_init_symbol_resolver();
-+    ksu_samsung_rkp_init();
++    ksu_rkp_init();
 +
-+    ret = ksu_samsung_kdp_init();
++    ret = ksu_kdp_init();
 +    if (ret) {
 +        pr_err("kdp: init failed: %d\n", ret);
 +        return ret;
@@ -1348,26 +1349,26 @@ index ee0ce665..05425f49 100644
      ksu_cred = prepare_creds();
      if (!ksu_cred) {
          pr_err("prepare cred failed!\n");
-@@ -149,7 +169,17 @@ int __init kernelsu_init(void)
-     susfs_init();
+@@ -165,6 +183,18 @@ int __init kernelsu_init(void)
  #endif
  
--    ksu_init_symbol_resolver();
+     ksu_init_symbol_resolver();
++
 +    /*
 +     * DEFEX is armed after the creds exist because it reports the
 +     * KernelSU task's credential triple, which needs a current cred.
 +     */
-+    ret = ksu_samsung_defex_init();
++    ret = ksu_defex_init();
 +    if (ret) {
 +        pr_err("defex: init failed: %d\n", ret);
 +        ksu_put_cred(ksu_cred);
 +        return ret;
 +    }
 +
-     ksu_syscall_hook_init();
- 
-     ksu_feature_init();
-@@ -269,7 +299,13 @@ void __exit kernelsu_exit(void)
+ #ifdef CONFIG_KSU_HOOK_SUSFS_INLINE
+     ret = ksu_syscall_table_init();
+     if (ret) {
+@@ -324,7 +354,13 @@ void __exit kernelsu_exit(void)
      ksu_feature_exit();
      ksu_module_blacklist_exit();
  
@@ -1376,14 +1377,14 @@ index ee0ce665..05425f49 100644
 +     * kprobes and RKP owns every branch site it installed, whose targets are this module's text.
 +     * They have to go before the module can, and the cred is released last because the KDP path
 +     * has to drop it through the Samsung reference counter. */
-+    ksu_samsung_defex_exit();
-+    ksu_samsung_rkp_exit();
++    ksu_defex_exit();
++    ksu_rkp_exit();
 +    ksu_put_cred(ksu_cred);
  }
  
  #if NEED_OWN_STACKPROTECTOR
 diff --git a/kernel/feature/mount_view_filter.c b/kernel/feature/mount_view_filter.c
-index d0ab836e..8983fcb3 100644
+index d0ab836e..38448dd5 100644
 --- a/kernel/feature/mount_view_filter.c
 +++ b/kernel/feature/mount_view_filter.c
 @@ -19,6 +19,7 @@
@@ -1394,35 +1395,46 @@ index d0ab836e..8983fcb3 100644
  #include "policy/allowlist.h"
  #include "policy/feature.h"
  #include "klog.h" // IWYU pragma: keep
-@@ -46,6 +47,8 @@ struct ksu_mvf_hook {
+@@ -46,6 +47,9 @@ struct ksu_mvf_hook {
      ksu_mvf_show_fn filtered_show;
      ksu_mvf_open_fn *open_slot;
      ksu_mvf_open_fn original_open;
-+    /* Where the wrapper must go to reach the old handler; see ksu_patch_text_callthru(). */
++    /* Where the wrapper must go to reach the old handler: the saved entry, or on the RKP
++     * route the continuation of the branch patch's stub. */
 +    ksu_mvf_open_fn callthru;
      bool patched;
  };
  
-@@ -274,7 +277,7 @@ static int ksu_mvf_open(struct inode *inode, struct file *file, unsigned int ind
+@@ -274,7 +278,12 @@ static int ksu_mvf_open(struct inode *inode, struct file *file, unsigned int ind
      struct seq_file *m;
      int ret;
  
 -    ret = ksu_mvf_call_open(hook->original_open, inode, file);
++    if (unlikely(!READ_ONCE(hook->callthru))) {
++        pr_err("mount_view_filter: %s has no way back to its open handler\n", hook->name);
++        return -EIO;
++    }
++
 +    ret = ksu_mvf_call_open(READ_ONCE(hook->callthru), inode, file);
      if (ret)
          return ret;
      if (!smp_load_acquire(&ksu_mvf_enabled) || !file->private_data)
-@@ -333,7 +336,8 @@ static int ksu_mvf_install_hooks(void)
-             pr_err("mount_view_filter: %s has no open handler\n", hook->name);
-             return -ENOSYS;
-         }
--        ret = ksu_patch_text(hook->open_slot, &wrapper, sizeof(wrapper), KSU_PATCH_TEXT_FLUSH_DCACHE);
-+        ret = ksu_patch_text_callthru(hook->open_slot, &wrapper, sizeof(wrapper),
-+                                      (void **)&hook->callthru, KSU_PATCH_TEXT_FLUSH_DCACHE);
-         if (ret) {
+@@ -338,6 +347,14 @@ static int ksu_mvf_install_hooks(void)
              pr_err("mount_view_filter: failed to hook %s: %d\n", hook->name, ret);
              return ret;
-@@ -354,7 +358,11 @@ static int ksu_mvf_restore_hooks(void)
+         }
++        hook->callthru = ksu_rkp_active() ? (ksu_mvf_open_fn)ksu_rkp_get_stub((void *)hook->original_open)
++                                          : hook->original_open;
++        if (unlikely(!hook->callthru)) {
++            pr_err("mount_view_filter: %s has no call-through, undoing\n", hook->name);
++            ksu_patch_text(hook->open_slot, &hook->original_open, sizeof(hook->original_open),
++                           KSU_PATCH_TEXT_FLUSH_DCACHE);
++            return -ENOENT;
++        }
+         hook->patched = true;
+     }
+     return 0;
+@@ -354,7 +371,11 @@ static int ksu_mvf_restore_hooks(void)
  
          if (!hook->patched)
              continue;
@@ -1431,24 +1443,33 @@ index d0ab836e..8983fcb3 100644
 +         * On a target that branches from the callee, the slot still holds the original
 +         * handler, so the comparison below would always look like a foreign replacement.
 +         */
-+        if (!ksu_samsung_rkp_active() && READ_ONCE(*hook->open_slot) != ksu_mvf_open_wrapper(i)) {
++        if (!ksu_rkp_active() && READ_ONCE(*hook->open_slot) != ksu_mvf_open_wrapper(i)) {
              pr_warn("mount_view_filter: %s open slot was replaced externally\n", hook->name);
              hook->patched = false;
              continue;
 diff --git a/kernel/feature/netisolate.c b/kernel/feature/netisolate.c
-index a3bdb0bc..385f47b1 100644
+index a3bdb0bc..07c51480 100644
 --- a/kernel/feature/netisolate.c
 +++ b/kernel/feature/netisolate.c
-@@ -55,6 +55,8 @@ struct ni_hook {
+@@ -18,6 +18,7 @@
+ #include <linux/uaccess.h>
+ 
+ #include <net/compat.h>
++#include "ksu_samsung_rkp.h"
+ 
+ #include "feature/netisolate.h"
+ #include "hook/patch_memory.h"
+@@ -55,6 +56,9 @@ struct ni_hook {
      syscall_fn_t *table;
      int nr;
      syscall_fn_t original;
-+    /* Where the wrapper must go to reach the old handler; see ksu_patch_text_callthru(). */
++    /* Where the wrapper must go to reach the old handler: the saved entry, or on the RKP
++     * route the continuation of the branch patch's stub. */
 +    syscall_fn_t callthru;
      syscall_fn_t replacement;
      bool installed;
  };
-@@ -113,7 +115,7 @@ static const int ni_compat_nrs[] = { 362, 369, 370, 345, 359 };
+@@ -113,7 +117,7 @@ static const int ni_compat_nrs[] = { 362, 369, 370, 345, 359 };
  
  static syscall_fn_t ni_original(enum ni_operation op, bool compat)
  {
@@ -1457,7 +1478,7 @@ index a3bdb0bc..385f47b1 100644
  }
  
  static unsigned long ni_arg(const struct pt_regs *regs, unsigned int index, bool compat)
-@@ -514,8 +516,10 @@ static void ni_fill_native_hooks(void)
+@@ -514,8 +518,10 @@ static void ni_fill_native_hooks(void)
          hook->table = ksu_syscall_table;
          hook->nr = ni_native_nrs[i];
          hook->replacement = ni_native_replacements[i];
@@ -1469,7 +1490,7 @@ index a3bdb0bc..385f47b1 100644
      }
  }
  
-@@ -560,8 +564,10 @@ static void ni_fill_compat_hooks(void)
+@@ -560,8 +566,10 @@ static void ni_fill_compat_hooks(void)
  #if defined(__aarch64__) || defined(__x86_64__)
          hook->replacement = ni_compat_replacements[i];
  #endif
@@ -1481,41 +1502,43 @@ index a3bdb0bc..385f47b1 100644
          if (!hook->original || hook->original == ni_syscall) {
              int nr = hook->nr;
  
-@@ -573,11 +579,12 @@ static void ni_fill_compat_hooks(void)
+@@ -573,11 +581,32 @@ static void ni_fill_compat_hooks(void)
      ni_compat_supported = true;
  }
  
 -static int ni_patch(const struct ni_hook *hook, syscall_fn_t replacement)
-+static int ni_patch(struct ni_hook *hook, syscall_fn_t replacement, void **callthru)
++static int ni_patch(struct ni_hook *hook, syscall_fn_t replacement)
  {
++    int ret;
++
      if (!hook->table || hook->nr < 0 || hook->nr >= NI_SYSCALL_LIMIT)
          return -EINVAL;
 -    return ksu_patch_text(&hook->table[hook->nr], &replacement, sizeof(replacement), KSU_PATCH_TEXT_FLUSH_DCACHE);
-+    return ksu_patch_text_callthru(&hook->table[hook->nr], &replacement, sizeof(replacement), callthru,
-+                                   KSU_PATCH_TEXT_FLUSH_DCACHE);
++
++    ret = ksu_patch_text(&hook->table[hook->nr], &replacement, sizeof(replacement),
++                         KSU_PATCH_TEXT_FLUSH_DCACHE);
++    if (ret)
++        return ret;
++    /* Unhooking passes the saved entry back in; the branch is already gone, so there is
++     * no stub to ask for - keep the entry callers still inside the wrapper must reach. */
++    hook->callthru = (ksu_rkp_active() && replacement != hook->original)
++                         ? (syscall_fn_t)ksu_rkp_get_stub((void *)hook->original)
++                         : hook->original;
++    if (unlikely(!hook->callthru)) {
++        /* The branch is live but the way back is unknown: every process that reaches this
++         * syscall would be sent through a NULL pointer by NI_HOOK().  Put the saved entry
++         * back and let the caller roll the rest back. */
++        pr_err("netisolate: no call-through for nr=%d, undoing\n", hook->nr);
++        ksu_patch_text(&hook->table[hook->nr], &hook->original, sizeof(hook->original),
++                       KSU_PATCH_TEXT_FLUSH_DCACHE);
++        return -ENOENT;
++    }
++    return 0;
  }
  
  static int ni_uninstall_hooks_locked(void);
-@@ -592,7 +599,7 @@ static int ni_install_hooks_locked(void)
- 
-         if (!hook->table || hook->installed)
-             continue;
--        ret = ni_patch(hook, hook->replacement);
-+        ret = ni_patch(hook, hook->replacement, (void **)&hook->callthru);
-         if (ret) {
-             pr_err("netisolate: patch failed table=%s nr=%d result=%d\n",
-                    hook->table == ksu_syscall_table ? "native" : "compat", hook->nr, ret);
-@@ -623,7 +630,7 @@ static int ni_uninstall_hooks_locked(void)
- 
-         if (!hook->table || !hook->installed)
-             continue;
--        err = ni_patch(hook, hook->original);
-+        err = ni_patch(hook, hook->original, NULL);
-         if (err) {
-             pr_err("netisolate: restore failed table=%s nr=%d result=%d\n",
-                    hook->table == ksu_syscall_table ? "native" : "compat", hook->nr, err);
 diff --git a/kernel/feature/selinux_hide.c b/kernel/feature/selinux_hide.c
-index 761c5ea0..6e409eb9 100644
+index 761c5ea0..1d39c4d7 100644
 --- a/kernel/feature/selinux_hide.c
 +++ b/kernel/feature/selinux_hide.c
 @@ -31,6 +31,7 @@
@@ -1540,7 +1563,7 @@ index 761c5ea0..6e409eb9 100644
  #endif
  
  #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
-@@ -100,12 +108,12 @@ static write_op_fn orig_context_write, orig_access_write;
+@@ -100,12 +108,14 @@ static write_op_fn orig_context_write, orig_access_write;
  #define ksu_task_security_struct cred_security_struct
  #endif
  
@@ -1551,11 +1574,13 @@ index 761c5ea0..6e409eb9 100644
      // apply to all app uids
      if (likely(current_uid().val < 10000)) {
 -        return orig_context_write(file, buf, size);
++        if (unlikely(!callthru_context_write))
++            return -EIO;
 +        return callthru_context_write(file, buf, size);
      }
  #endif
      char *canon = NULL;
-@@ -140,12 +148,12 @@ out:
+@@ -140,12 +150,14 @@ out:
      return length;
  }
  
@@ -1566,11 +1591,13 @@ index 761c5ea0..6e409eb9 100644
      // apply to all app uids
      if (likely(current_uid().val < 10000)) {
 -        return orig_access_write(file, buf, size);
++        if (unlikely(!callthru_access_write))
++            return -EIO;
 +        return callthru_access_write(file, buf, size);
      }
  #endif
      char *scon = NULL, *tcon = NULL;
-@@ -205,6 +213,8 @@ int my_setprocattr(const char *name, void *value, size_t size);
+@@ -205,6 +217,8 @@ int my_setprocattr(const char *name, void *value, size_t size);
  static int __nocfi my_setprocattr(const char *name, void *value, size_t size);
  struct ksu_lsm_hook selinux_setprocattr_hook = KSU_LSM_HOOK_INIT(setprocattr, "selinux_setprocattr", my_setprocattr, 0);
  typedef int (*setprocattr_fn)(const char *name, void *value, size_t size);
@@ -1579,7 +1606,7 @@ index 761c5ea0..6e409eb9 100644
  #endif
  
  static u32 ksu_ptrace_parent_sid(void)
-@@ -289,7 +299,7 @@ abort_change:
+@@ -289,7 +303,7 @@ abort_change:
  
  #ifndef CONFIG_KSU_SUSFS
  call_orig:
@@ -1588,7 +1615,7 @@ index 761c5ea0..6e409eb9 100644
  #endif
  }
  
-@@ -354,7 +364,8 @@ out:
+@@ -354,7 +368,8 @@ out:
  
  typedef int (*sel_open_handle_status_fn)(struct inode *inode, struct file *filp);
  static sel_open_handle_status_fn orig_sel_open_handle_status, *sel_open_handle_status_slot;
@@ -1598,11 +1625,14 @@ index 761c5ea0..6e409eb9 100644
  {
      if (likely(current_uid().val >= 10000 && ksu_selinux_hide_enabled)) {
          void *data = fake_status;
-@@ -364,32 +375,145 @@ static int my_sel_open_handle_status(struct inode *inode, struct file *filp)
+@@ -364,15 +379,116 @@ static int my_sel_open_handle_status(struct inode *inode, struct file *filp)
          }
      }
  
 -    int ret = orig_sel_open_handle_status(inode, filp);
++    if (unlikely(!callthru_sel_open_handle_status))
++        return -EIO;
++
 +    int ret = callthru_sel_open_handle_status(inode, filp);
      if (static_branch_unlikely(&fake_status_initialize_key) && !ret && !fake_status) {
          initialize_fake_status();
@@ -1681,10 +1711,9 @@ index 761c5ea0..6e409eb9 100644
 +/*
 + * Install @hook over @slot and record how a caller reaches the displaced original.
 + *
-+ * On the RKP route the call-through entry has to be published together with the branch:
-+ * ksu_samsung_rkp_branch_patch_callthru() hands back a stub that is already runnable when the
-+ * branch goes live.  Patching first and fetching the stub afterwards leaves a window in which
-+ * my_write_context() / my_write_access() would call a NULL call-through.
++ * On the RKP route the slot keeps its value and the function it points at gets a branch, so
++ * the way back is that branch patch's stub rather than @orig itself.  The stub is fetched
++ * after the patch; the write handlers guard against a NULL with -EIO.
 + */
 +static int selinux_hide_install_write_op(write_op_fn *slot, write_op_fn hook, write_op_fn *orig,
 +                                         write_op_fn *callthru)
@@ -1692,34 +1721,30 @@ index 761c5ea0..6e409eb9 100644
 +    int ret;
 +
 +    *orig = *slot;
-+    ret = ksu_patch_text_callthru(slot, &hook, sizeof(hook), (void **)callthru,
-+                                  KSU_PATCH_TEXT_FLUSH_DCACHE);
++    ret = ksu_patch_text(slot, &hook, sizeof(hook), KSU_PATCH_TEXT_FLUSH_DCACHE);
 +    if (ret) {
 +        pr_err("selinux_hide: init: patch %pSb err: %d\n", *orig, ret);
 +        *orig = NULL;
++        return ret;
 +    }
-+    return ret;
++
++    *callthru = ksu_rkp_active() ? (write_op_fn)ksu_rkp_get_stub(*orig) : *orig;
++    if (unlikely(!*callthru)) {
++        /* Handlers answer -EIO without one, so leaving it NULL would only turn the whole
++         * feature into a silent no-op.  Take the branch back out and report the failure. */
++        pr_err("selinux_hide: init: no call-through for %pSb, undoing\n", *orig);
++        ksu_patch_text(slot, orig, sizeof(*orig), KSU_PATCH_TEXT_FLUSH_DCACHE);
++        *orig = NULL;
++        return -ENOENT;
++    }
++    return 0;
 +}
 +#endif
 +
  static int ksu_selinux_hide_enable()
  {
-+#ifdef CONFIG_KSU_SUSFS
-+    return 0;
-+#else
-+    int ret;
-+
      pr_info("selinux_hide: init selinux hide\n");
-     if (!backup_sepolicy) {
-         pr_err("no backup sepolicy available, please save feature and reboot to retry!\n");
-         return -EAGAIN;
-     }
--#ifdef CONFIG_KSU_SUSFS
--    return 0;
--#else
--    int ret;
-     selinux_write_op = find_kernel_symbol_exact("write_op");
-     if (!selinux_write_op) {
+@@ -389,7 +505,30 @@ static int ksu_selinux_hide_enable()
          pr_err("selinux_hide: no write_op found!\n");
          return -ENOSYS;
      }
@@ -1751,7 +1776,7 @@ index 761c5ea0..6e409eb9 100644
  
      security_dump_masked_av_fn = find_kernel_symbol_exact("security_dump_masked_av");
      if (!security_dump_masked_av_fn) {
-@@ -402,66 +526,59 @@ static int ksu_selinux_hide_enable()
+@@ -402,66 +541,57 @@ static int ksu_selinux_hide_enable()
  
      context_write = &selinux_write_op[SEL_CONTEXT];
      pr_info("selinux_hide: context_write: 0x%lx [%pSb]\n", (unsigned long)*context_write, *context_write);
@@ -1788,11 +1813,9 @@ index 761c5ea0..6e409eb9 100644
 +        ksu_selinux_hide_unhook();
 +        return -ENOSYS;
 +    }
-+    /*
-+     * ksu_lsm_hook() publishes the call-through before the slot can reach my_setprocattr(),
-+     * so this is the same pointer on an RKP kernel and on one that writes the slot.
-+     */
-+    callthru_setprocattr = (setprocattr_fn)selinux_setprocattr_hook.callthru;
++    /* ksu_lsm_hook() resolves the way back once the hook is in place: the saved entry on a
++     * writable slot, the branch patch's stub on an RKP kernel. */
++    callthru_setprocattr = (setprocattr_fn)READ_ONCE(selinux_setprocattr_hook.callthru);
 +    if (unlikely(!callthru_setprocattr)) {
 +        /* Defensive: a live hook with no way back would fault on its first call, and
 +         * enable() is not called again once it returned 0, so unwind the feature. */
@@ -1852,7 +1875,7 @@ index 761c5ea0..6e409eb9 100644
  #ifndef CONFIG_KSU_SUSFS
      ksu_lsm_unhook(&selinux_setprocattr_hook);
  #endif
-@@ -529,26 +646,56 @@ void ksu_selinux_hide_handle_post_fs_data()
+@@ -529,26 +659,59 @@ void ksu_selinux_hide_handle_post_fs_data()
      }
  }
  
@@ -1875,9 +1898,8 @@ index 761c5ea0..6e409eb9 100644
      sel_open_handle_status_fn new_fn = my_sel_open_handle_status;
 -    orig_sel_open_handle_status = *sel_open_handle_status_slot;
 -    int ret = ksu_patch_text(sel_open_handle_status_slot, &new_fn, sizeof(new_fn), KSU_PATCH_TEXT_FLUSH_DCACHE);
-+    int ret = ksu_patch_text_callthru(sel_open_handle_status_slot, &new_fn, sizeof(new_fn),
-+                                      (void **)&callthru_sel_open_handle_status,
-+                                      KSU_PATCH_TEXT_FLUSH_DCACHE);
++    int ret = ksu_patch_text(sel_open_handle_status_slot, &new_fn, sizeof(new_fn),
++                             KSU_PATCH_TEXT_FLUSH_DCACHE);
      if (ret) {
 -        pr_err("selinux_hide: init: patch_text sel_open_handle_status err: %d\n", ret);
 +        pr_err("selinux_hide: init: patch sel_open_handle_status err: %d\n", ret);
@@ -1886,6 +1908,10 @@ index 761c5ea0..6e409eb9 100644
 +        callthru_sel_open_handle_status = NULL;
 +        return ret;
      }
++
++    callthru_sel_open_handle_status =
++        ksu_rkp_active() ? (sel_open_handle_status_fn)ksu_rkp_get_stub((void *)orig_sel_open_handle_status)
++                         : orig_sel_open_handle_status;
 +    if (callthru_sel_open_handle_status)
 +        return 0;
 +
@@ -1915,7 +1941,7 @@ index 761c5ea0..6e409eb9 100644
  }
  
  void __init ksu_selinux_hide_init()
-@@ -562,7 +709,8 @@ void __init ksu_selinux_hide_init()
+@@ -562,7 +725,8 @@ void __init ksu_selinux_hide_init()
          static_key_enable(&fake_status_initialize_key.key);
      }
  #ifndef CONFIG_KSU_SUSFS
@@ -1925,7 +1951,7 @@ index 761c5ea0..6e409eb9 100644
  #endif
  }
  
-@@ -572,7 +720,23 @@ void __exit ksu_selinux_hide_exit()
+@@ -572,7 +736,23 @@ void __exit ksu_selinux_hide_exit()
      if (ksu_selinux_hide_running) {
          ksu_selinux_hide_disable();
          ksu_selinux_hide_running = false;
@@ -1950,7 +1976,7 @@ index 761c5ea0..6e409eb9 100644
      ksu_unregister_feature_handler(KSU_FEATURE_SELINUX_HIDE);
      mutex_lock(&selinux_state.status_lock);
 diff --git a/kernel/hook/arm64/patch_memory.c b/kernel/hook/arm64/patch_memory.c
-index c344bd55..8bc69f09 100644
+index 185557c4..a38f2de4 100644
 --- a/kernel/hook/arm64/patch_memory.c
 +++ b/kernel/hook/arm64/patch_memory.c
 @@ -6,6 +6,7 @@
@@ -1961,54 +1987,24 @@ index c344bd55..8bc69f09 100644
  #include "klog.h" // IWYU pragma: keep
  #include "linux/cpumask.h"
  #include "linux/gfp.h" // IWYU pragma: keep
-@@ -188,6 +189,15 @@ static int ksu_patch_text_cb(void *arg)
+@@ -184,6 +185,15 @@ int ksu_patch_text(void *dst, void *src, size_t len, int flags)
+         .flags = flags,
+     };
  
- int ksu_patch_text(void *dst, void *src, size_t len, int flags)
- {
 +    /*
 +     * One shape survives on a target whose text and rodata are taken away at EL2, and it is
 +     * the one most callers use: an 8-byte function-pointer slot.  It is not written at all -
 +     * the function the slot points at gets a branch instead - so the slot stays read-only and
 +     * every caller, the table included, reaches the replacement.
 +     */
-+    if (len == sizeof(void *) && ksu_samsung_rkp_active())
-+        return ksu_samsung_rkp_branch_patch(dst, src);
++    if (len == sizeof(void *) && ksu_rkp_active())
++        return ksu_rkp_branch_patch(dst, src);
 +
-     struct patch_text_info info = {
-         .dst = dst,
-         .src = src,
-@@ -199,6 +209,29 @@ int ksu_patch_text(void *dst, void *src, size_t len, int flags)
-     return stop_machine(ksu_patch_text_cb, &info, cpu_online_mask);
- }
- 
-+int ksu_patch_text_callthru(void *dst, void *src, size_t len, void **callthru, int flags)
-+{
-+    int ret;
-+
-+    if (!callthru)
-+        return ksu_patch_text(dst, src, len, flags);
-+
-+    /*
-+     * Same fork as ksu_patch_text(), except that the caller says it will call what it
-+     * replaced.  The branch patcher publishes the stub before it writes the branch, so
-+     * callers never see a replacement whose way back is not there yet.
-+     */
-+    if (len == sizeof(void *) && ksu_samsung_rkp_active())
-+        return ksu_samsung_rkp_branch_patch_callthru(dst, src, callthru);
-+
-+    WRITE_ONCE(*callthru, READ_ONCE(*(void **)dst));
-+    smp_wmb();
-+    ret = ksu_patch_text(dst, src, len, flags);
-+    if (ret)
-+        WRITE_ONCE(*callthru, NULL);
-+    return ret;
-+}
-+
- /*
-  * Scan the memory region [start, start+size) for a BL instruction whose
-  * branch target equals `target`.  Returns the address of the first matching
+     ret = stop_machine(ksu_patch_text_cb, &info, cpu_online_mask);
+     if (ret)
+         pr_err("failed to patch kernel address 0x%lx: %d\n", (unsigned long)dst, ret);
 diff --git a/kernel/hook/arm64/syscall_hook.c b/kernel/hook/arm64/syscall_hook.c
-index 7b4c29ff..f13bfb6e 100644
+index ecf798ad..8516377d 100644
 --- a/kernel/hook/arm64/syscall_hook.c
 +++ b/kernel/hook/arm64/syscall_hook.c
 @@ -6,6 +6,7 @@
@@ -2031,32 +2027,35 @@ index 7b4c29ff..f13bfb6e 100644
      if (ksu_syscall_table == NULL)
          return -ENOENT;
      if (nr < 0 || nr >= __NR_syscalls)
-@@ -38,8 +41,15 @@ static int patch_syscall_table(int nr, syscall_fn_t fn)
+@@ -38,8 +41,19 @@ static int patch_syscall_table(int nr, syscall_fn_t fn)
      pr_info("patch syscall %d, 0x%lx -> 0x%lx\n", nr, (unsigned long)READ_ONCE(ksu_syscall_table[nr]),
              (unsigned long)fn);
  
 -    if (ksu_patch_text(&ksu_syscall_table[nr], &fn, sizeof(fn), KSU_PATCH_TEXT_FLUSH_DCACHE)) {
 -        pr_err("patch syscall %d failed\n", nr);
-+    /* @callthru_out receives the callable entry for the displaced original before the branch goes
-+     * live; that is what keeps a wrapper calling its saved original
-+     * (ksu_sys_read/ksu_sys_fstat) out of an endless recursion.
++    /*
++     * On a target that refuses the slot write (Samsung RKP) the slot keeps its value and the
++     * function it points at gets a branch instead.  @callthru_out is then handed the callable
++     * entry for the displaced original, which is what keeps a wrapper calling its saved
++     * original (ksu_sys_read/ksu_sys_fstat) out of an endless recursion.
 +     */
-+    ret = ksu_patch_text_callthru(&ksu_syscall_table[nr], &fn, sizeof(fn), (void **)callthru_out,
-+                                  KSU_PATCH_TEXT_FLUSH_DCACHE);
++    if (callthru_out && ksu_rkp_active())
++        ret = ksu_rkp_branch_patch_callthru(&ksu_syscall_table[nr], &fn, (void **)callthru_out);
++    else
++        ret = ksu_patch_text(&ksu_syscall_table[nr], &fn, sizeof(fn), KSU_PATCH_TEXT_FLUSH_DCACHE);
 +
 +    if (ret) {
 +        pr_err("patch syscall %d failed: %d\n", nr, ret);
          return -EIO;
      }
  
-@@ -60,9 +70,21 @@ void ksu_syscall_table_hook(int nr, syscall_fn_t fn, syscall_fn_t *old)
+@@ -60,9 +74,20 @@ void ksu_syscall_table_hook(int nr, syscall_fn_t fn, syscall_fn_t *old)
      mutex_lock(&hooked_entries_lock);
  
      syscall_fn_t orig = READ_ONCE(ksu_syscall_table[nr]);
 +    /* What the slot held before the patch.  On RKP the call-through route rewrites *old into the
 +     * stub (that is what the caller must call to reach the original), so *old can no longer tell
 +     * us what to restore.  The table needs the untouched value. */
-+    syscall_fn_t orig_fn = orig;
      if (old)
          *old = orig;
  
@@ -2071,15 +2070,7 @@ index 7b4c29ff..f13bfb6e 100644
      // Record for later restoration
      int i;
      bool found = false;
-@@ -75,15 +97,13 @@ void ksu_syscall_table_hook(int nr, syscall_fn_t fn, syscall_fn_t *old)
-     if (!found) {
-         if (hooked_count < ARRAY_SIZE(hooked_entries)) {
-             hooked_entries[hooked_count].nr = nr;
--            hooked_entries[hooked_count].orig = orig;
-+            hooked_entries[hooked_count].orig = orig_fn;
-             hooked_count++;
-         } else {
-             pr_warn("hooked_entries full, cannot track syscall %d for restoration\n", nr);
+@@ -82,8 +107,6 @@ void ksu_syscall_table_hook(int nr, syscall_fn_t fn, syscall_fn_t *old)
          }
      }
  
@@ -2088,7 +2079,7 @@ index 7b4c29ff..f13bfb6e 100644
      mutex_unlock(&hooked_entries_lock);
  }
  
-@@ -101,7 +121,7 @@ void ksu_syscall_table_unhook(int nr)
+@@ -101,7 +124,7 @@ void ksu_syscall_table_unhook(int nr)
  
      for (i = 0; i < hooked_count; i++) {
          if (hooked_entries[i].nr == nr) {
@@ -2097,23 +2088,23 @@ index 7b4c29ff..f13bfb6e 100644
              // Remove entry by swapping with last
              hooked_entries[i] = hooked_entries[--hooked_count];
              mutex_unlock(&hooked_entries_lock);
-@@ -202,6 +222,7 @@ bool ksu_has_syscall_hook(int nr)
- void __init ksu_syscall_hook_init(void)
+@@ -214,6 +237,7 @@ int __init ksu_syscall_hook_init(void)
  {
      int ni_slot;
+     int ret;
 +    syscall_fn_t orig;
  
      memset(syscall_hooks, 0, sizeof(syscall_hooks));
  
-@@ -217,8 +238,25 @@ void __init ksu_syscall_hook_init(void)
-         return;
+@@ -227,9 +251,19 @@ int __init ksu_syscall_hook_init(void)
+         return -ENOENT;
      }
  
 +    orig = READ_ONCE(ksu_syscall_table[ni_slot]);
 +
      ksu_dispatcher_nr = ni_slot;
      ksu_syscall_table_hook(ksu_dispatcher_nr, (syscall_fn_t)ksu_syscall_dispatcher, NULL);
-+
+-    if (READ_ONCE(ksu_syscall_table[ksu_dispatcher_nr]) != (syscall_fn_t)ksu_syscall_dispatcher) {
 +    /*
 +     * ksu_syscall_table_hook() has no way to report back (upstream signature), so verify the
 +     * result here.  A target that refuses the slot write (Samsung RKP) gets a branch at the
@@ -2121,90 +2112,53 @@ index 7b4c29ff..f13bfb6e 100644
 +     * dispatcher number is worse than none: the sys_enter redirect would hand every hooked
 +     * syscall to ni_syscall and return -ENOSYS for the uids those hooks serve.
 +     */
-+    if (READ_ONCE(ksu_syscall_table[ni_slot]) != (syscall_fn_t)ksu_syscall_dispatcher &&
-+        !ksu_samsung_rkp_get_stub((void *)orig)) {
-+        pr_warn("dispatcher not installed at slot %d; syscall event hooks disabled\n", ni_slot);
-+        ksu_dispatcher_nr = -1;
-+        return;
-+    }
-+
-     pr_info("dispatcher installed at slot %d\n", ksu_dispatcher_nr);
- }
- 
++    if (READ_ONCE(ksu_syscall_table[ksu_dispatcher_nr]) != (syscall_fn_t)ksu_syscall_dispatcher &&
++        !ksu_rkp_get_stub((void *)orig)) {
+         ksu_dispatcher_nr = -1;
+         return -EIO;
+     }
 diff --git a/kernel/hook/lsm_hook.c b/kernel/hook/lsm_hook.c
-index 4598c6bc..f04ed121 100644
+index 4598c6bc..46e080be 100644
 --- a/kernel/hook/lsm_hook.c
 +++ b/kernel/hook/lsm_hook.c
-@@ -61,12 +61,18 @@ static void ksu_lsm_hook_untrack(struct ksu_lsm_hook *hook)
-     }
- }
+@@ -6,6 +6,7 @@
+ #include <linux/mutex.h>
+ #include <linux/rcupdate.h>
+ #include <linux/string.h>
++#include "ksu_samsung_rkp.h"
  
--static int ksu_lsm_hook_patch_slot(void **slot, void *value)
-+/*
-+ * @callthru, when non-NULL, receives the entry a replacement must call to reach the
-+ * handler that was in @slot.  The patcher publishes it before the slot becomes
-+ * reachable, so a replacement never observes its own slot live with no way back.
-+ */
-+static int ksu_lsm_hook_patch_slot(void **slot, void *value, void **callthru)
- {
-     void *patched = value;
-     int ret;
+ #include "infra/symbol_resolver.h"
+ #include "hook/lsm_hook.h"
+@@ -274,6 +275,12 @@ int ksu_lsm_hook(struct ksu_lsm_hook *hook)
+     hook->entry = selected_entry;
+     hook->scall = selected_scall;
+     hook->original = selected_origin;
++    hook->callthru = ksu_rkp_active() ? ksu_rkp_get_stub(selected_origin) : selected_origin;
++    if (unlikely(!hook->callthru)) {
++        pr_err("lsm_hook: no call-through for %s, not installing\n", hook->head_name ?: "unknown");
++        ret = -ENOENT;
++        goto out_untrack;
++    }
+     pr_info("lsm_hook: patched %s hook slot %px from %px to %px\n", hook->head_name ?: "unknown", selected_slot,
+             selected_origin, hook->replacement);
+ #else
+@@ -381,6 +388,15 @@ int ksu_lsm_hook(struct ksu_lsm_hook *hook)
  
--    ret = ksu_patch_text(slot, &patched, sizeof(patched), KSU_PATCH_TEXT_FLUSH_DCACHE);
-+    ret = ksu_patch_text_callthru(slot, &patched, sizeof(patched), callthru,
-+                                  KSU_PATCH_TEXT_FLUSH_DCACHE);
-     if (!ret)
-         smp_wmb();
- 
-@@ -254,14 +260,14 @@ int ksu_lsm_hook(struct ksu_lsm_hook *hook)
-         goto out_unlock;
-     }
- 
--    if (ksu_lsm_hook_patch_slot(selected_slot, hook->replacement)) {
-+    if (ksu_lsm_hook_patch_slot(selected_slot, hook->replacement, &hook->callthru)) {
-         pr_err("lsm_hook: failed to patch %s\n", hook->head_name ?: "unknown");
-         ret = -EFAULT;
-         goto out_untrack;
-     }
- 
-     if (ksu_lsm_hook_update_scall(selected_scall, hook->replacement)) {
--        if (ksu_lsm_hook_patch_slot(selected_slot, selected_origin)) {
-+        if (ksu_lsm_hook_patch_slot(selected_slot, selected_origin, NULL)) {
-             pr_err("lsm_hook: failed to roll back %s after static call update failure\n", hook->head_name ?: "unknown");
-         }
-         ret = -EFAULT;
-@@ -367,10 +373,10 @@ int ksu_lsm_hook(struct ksu_lsm_hook *hook)
- 
-     if (selected_origin) {
-         pr_info("patch func addr\n");
--        ret = ksu_lsm_hook_patch_slot(selected_slot, hook->replacement);
-+        ret = ksu_lsm_hook_patch_slot(selected_slot, hook->replacement, &hook->callthru);
-     } else {
-         pr_info("patch head->first\n");
--        ret = ksu_lsm_hook_patch_slot(selected_slot, &hook->list);
-+        ret = ksu_lsm_hook_patch_slot(selected_slot, &hook->list, NULL);
-     }
- 
-     if (ret) {
-@@ -418,7 +424,7 @@ void ksu_lsm_unhook(struct ksu_lsm_hook *hook)
-         pr_info("unhook patch slot\n");
-     }
+     hook->entry = selected_entry;
+     hook->original = selected_origin;
++
++    hook->callthru = selected_origin
++                         ? (ksu_rkp_active() ? ksu_rkp_get_stub(selected_origin) : selected_origin)
++                         : NULL;
++    if (unlikely(!hook->callthru)) {
++        pr_err("lsm_hook: no call-through for %s, not installing\n", hook->head_name ?: "unknown");
++        ret = -ENOENT;
++        goto out_untrack;
++    }
+     pr_info("lsm_hook: patched %s hook slot %px from %px to %px\n", hook->head_name ?: "unknown", selected_slot,
+             selected_origin, hook->replacement);
  #endif
--    if (ksu_lsm_hook_patch_slot(slot, hook->original)) {
-+    if (ksu_lsm_hook_patch_slot(slot, hook->original, NULL)) {
-         pr_err("lsm_hook: failed to restore %s\n", hook->head_name ?: "unknown");
-         mutex_unlock(&ksu_lsm_hook_lock);
-         return;
-@@ -426,7 +432,7 @@ void ksu_lsm_unhook(struct ksu_lsm_hook *hook)
- 
- #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 12, 0)
-     if (ksu_lsm_hook_update_scall(hook->scall, hook->original)) {
--        if (ksu_lsm_hook_patch_slot(slot, hook->replacement))
-+        if (ksu_lsm_hook_patch_slot(slot, hook->replacement, NULL))
-             pr_err("lsm_hook: failed to reapply %s after static call restore failure\n", hook->head_name ?: "unknown");
-         mutex_unlock(&ksu_lsm_hook_lock);
-         return;
-@@ -434,6 +440,12 @@ void ksu_lsm_unhook(struct ksu_lsm_hook *hook)
+@@ -434,6 +450,12 @@ void ksu_lsm_unhook(struct ksu_lsm_hook *hook)
  #endif
  
      synchronize_rcu();
@@ -2218,7 +2172,7 @@ index 4598c6bc..f04ed121 100644
      ksu_lsm_hook_untrack(hook);
      hook->entry = NULL;
 diff --git a/kernel/hook/lsm_hook.h b/kernel/hook/lsm_hook.h
-index 73895787..b2980f94 100644
+index 73895787..1861e03f 100644
 --- a/kernel/hook/lsm_hook.h
 +++ b/kernel/hook/lsm_hook.h
 @@ -18,6 +18,13 @@ struct ksu_lsm_hook {
@@ -2227,79 +2181,38 @@ index 73895787..b2980f94 100644
      void *original;
 +    /*
 +     * What a replacement must call to reach the handler it replaced.  On a kernel whose
-+     * slots are writable it is @original; on an RKP kernel the slot is never written and
-+     * the branch patcher publishes a stub, so it is that stub's continuation instead.
-+     * ksu_lsm_hook() fills it before the slot can reach @replacement.
++     * slots are writable it is @original; on an RKP kernel the slot keeps its value and
++     * the function it points at gets a branch, so it is the continuation of that branch
++     * patch's stub.  ksu_lsm_hook() fills it once the patch is in place.
 +     */
 +    void *callthru;
      struct security_hook_list *entry;
  #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 12, 0)
      struct lsm_static_call *scall;
-@@ -53,8 +60,9 @@ struct ksu_lsm_hook {
- // --- Direct LSM hook patching API (hook/unhook) ---
- // Replace the hook function in security_hook_heads[@head_name] that currently
+@@ -55,6 +62,8 @@ struct ksu_lsm_hook {
  // points to @target_name with @replacement.
--// Saves the original handler into hook->original and records the patched entry
--// for restoration by ksu_lsm_unhook() or the global ksu_lsm_hook_exit().
-+// Saves the original handler into hook->original, the entry a replacement must call into
-+// hook->callthru, and records the patched entry for restoration by ksu_lsm_unhook() or
-+// the global ksu_lsm_hook_exit().  Both are filled before @replacement is reachable.
+ // Saves the original handler into hook->original and records the patched entry
+ // for restoration by ksu_lsm_unhook() or the global ksu_lsm_hook_exit().
++// The entry a replacement must call is saved into hook->callthru: @original on a
++// kernel with writable slots, the branch stub's continuation on an RKP kernel.
  int ksu_lsm_hook(struct ksu_lsm_hook *hook);
  
  // Restore the LSM hook entry previously patched by ksu_lsm_hook() back to the
-diff --git a/kernel/hook/patch_memory.h b/kernel/hook/patch_memory.h
-index 0814d5f5..3b2cde96 100644
---- a/kernel/hook/patch_memory.h
-+++ b/kernel/hook/patch_memory.h
-@@ -28,6 +28,33 @@
- 
- unsigned long phys_from_virt(unsigned long addr, int *err);
- int ksu_patch_text(void *dst, void *src, size_t len, int flags);
-+
-+#ifdef __aarch64__
-+/*
-+ * Patch a function-pointer slot and hand back an entry that still reaches the code which
-+ * was there before.  On a target whose text and rodata are taken away at EL2 the slot is
-+ * never written: the function it points at gets a branch instead, so the only callable
-+ * entry is the stub that branch patch installs.  That stub has to be published before the
-+ * branch goes live, otherwise a replacement that calls "the original" jumps back into the
-+ * entry it just replaced.
-+ */
-+int ksu_patch_text_callthru(void *dst, void *src, size_t len, void **callthru, int flags);
-+#else
-+static inline int ksu_patch_text_callthru(void *dst, void *src, size_t len, void **callthru, int flags)
-+{
-+    int ret;
-+
-+    if (!callthru)
-+        return ksu_patch_text(dst, src, len, flags);
-+    WRITE_ONCE(*callthru, READ_ONCE(*(void **)dst));
-+    smp_wmb();
-+    ret = ksu_patch_text(dst, src, len, flags);
-+    if (ret)
-+        WRITE_ONCE(*callthru, NULL);
-+    return ret;
-+}
-+#endif
-+
- void *scan_call_to(void *start, size_t size, void *target);
- 
- #endif
 diff --git a/kernel/hook/tp_marker.c b/kernel/hook/tp_marker.c
-index c78bbbdd..5666403a 100644
+index 61935e3c..3ffaabb9 100644
 --- a/kernel/hook/tp_marker.c
 +++ b/kernel/hook/tp_marker.c
-@@ -7,6 +7,7 @@
+@@ -6,6 +6,7 @@
+ #include <linux/sched/signal.h>
  #include <linux/sched/task.h>
  
- #include "policy/allowlist.h"
 +#include "ksu_samsung_kdp.h"
- #include "klog.h" // IWYU pragma: keep
+ #include "policy/allowlist.h"
  #include "selinux/selinux.h"
  
-@@ -100,7 +101,7 @@ void ksu_mark_running_process_locked(void)
+@@ -95,7 +96,7 @@ void ksu_mark_running_process_locked(void)
+         } else {
              ksu_clear_task_tracepoint_flag(t);
-             pr_info("tp_marker: unmark process: pid:%d, uid: %d, comm:%s\n", t->pid, uid, t->comm);
          }
 -        put_cred(cred);
 +        ksu_put_cred(cred);
@@ -2308,33 +2221,33 @@ index c78bbbdd..5666403a 100644
  }
 diff --git a/kernel/include/ksu_samsung_kdp.h b/kernel/include/ksu_samsung_kdp.h
 new file mode 100644
-index 00000000..1910d712
+index 00000000..f129f5b4
 --- /dev/null
 +++ b/kernel/include/ksu_samsung_kdp.h
 @@ -0,0 +1,15 @@
-+#ifndef __KSU_H_SAMSUNG_KDP
-+#define __KSU_H_SAMSUNG_KDP
++#ifndef __KSU_SAMSUNG_KDP_H
++#define __KSU_SAMSUNG_KDP_H
 +
 +#include <linux/cred.h>
 +
-+int ksu_samsung_kdp_init(void);
-+int ksu_samsung_kdp_commit_creds(struct cred *cred);
-+void ksu_samsung_kdp_put_cred(const struct cred *cred);
++int ksu_kdp_init(void);
++int ksu_kdp_commit_creds(struct cred *cred);
++void ksu_kdp_put_cred(const struct cred *cred);
 +
 +static inline void ksu_put_cred(const struct cred *cred)
 +{
-+    ksu_samsung_kdp_put_cred(cred);
++    ksu_kdp_put_cred(cred);
 +}
 +
 +#endif
 diff --git a/kernel/include/ksu_samsung_rkp.h b/kernel/include/ksu_samsung_rkp.h
 new file mode 100644
-index 00000000..80ef8fae
+index 00000000..a7b78d56
 --- /dev/null
 +++ b/kernel/include/ksu_samsung_rkp.h
 @@ -0,0 +1,58 @@
-+#ifndef __KSU_H_SAMSUNG_RKP
-+#define __KSU_H_SAMSUNG_RKP
++#ifndef __KSU_SAMSUNG_RKP_H
++#define __KSU_SAMSUNG_RKP_H
 +
 +/*
 + * Samsung RKP-aware function replacement.
@@ -2346,7 +2259,7 @@ index 00000000..80ef8fae
 + * function the slot points at, so every caller - the table included - reaches the
 + * replacement.
 + *
-+ * The replacement is a *wrapper*, not a replacement: ksu_samsung_rkp_get_stub() hands back
++ * The replacement is a *wrapper*, not a replacement: ksu_rkp_get_stub() hands back
 + * an address that runs the displaced instruction and continues in the original function, so
 + * a caller that used to call the saved original keeps working.  Calling the original address
 + * itself would re-enter the branch, which is why the stub exists.
@@ -2359,11 +2272,11 @@ index 00000000..80ef8fae
 +#include <linux/types.h>
 +
 +/* Detects RKP once.  Never fails the caller: a kernel without it keeps the plain routes. */
-+void ksu_samsung_rkp_init(void);
-+void ksu_samsung_rkp_exit(void);
++void ksu_rkp_init(void);
++void ksu_rkp_exit(void);
 +
 +/* True once RKP was seen; the branch route is only usable then. */
-+bool ksu_samsung_rkp_active(void);
++bool ksu_rkp_active(void);
 +
 +/*
 + * Replace the function @dst points at with the function @src points at.
@@ -2371,7 +2284,7 @@ index 00000000..80ef8fae
 + * 0 on success, a negative errno otherwise; every failure is logged here and leaves the
 + * kernel exactly as it was found.
 + */
-+int ksu_samsung_rkp_branch_patch(void *dst, void *src);
++int ksu_rkp_branch_patch(void *dst, void *src);
 +
 +/*
 + * The same, and on success it also publishes the callable entry for the displaced original into
@@ -2381,18 +2294,18 @@ index 00000000..80ef8fae
 + * forever.  What is written is the stub, which is a valid entry before the branch goes in too,
 + * so the caller needs no second step and no window.
 + */
-+int ksu_samsung_rkp_branch_patch_callthru(void *dst, void *src, void **callthru);
++int ksu_rkp_branch_patch_callthru(void *dst, void *src, void **callthru);
 +
 +/* Callable entry for the function that was branch-patched, or NULL if it was not.
 + *
 + * The pointer is valid only while the site exists: take it in the enable path and do not hold it
-+ * across ksu_samsung_rkp_exit(), which restores the sites and may free the stub page.
++ * across ksu_rkp_exit(), which restores the sites and may free the stub page.
 + */
-+void *ksu_samsung_rkp_get_stub(void *fn);
++void *ksu_rkp_get_stub(void *fn);
 +
 +#endif
 diff --git a/kernel/policy/app_profile.c b/kernel/policy/app_profile.c
-index 10d03262..e4208023 100644
+index 10d03262..7493411a 100644
 --- a/kernel/policy/app_profile.c
 +++ b/kernel/policy/app_profile.c
 @@ -18,6 +18,8 @@
@@ -2417,11 +2330,11 @@ index 10d03262..e4208023 100644
      setup_selinux(profile->selinux_domain, cred);
  
 -    commit_creds(cred);
-+    ret = ksu_samsung_kdp_commit_creds(cred);
++    ret = ksu_kdp_commit_creds(cred);
 +    if (ret) {
 +        pr_err("samsung_kdp: credential install failed: %d\n", ret);
 +    } else {
-+        ksu_samsung_defex_sync_current();
++        ksu_defex_sync_current();
  
 -    disable_seccomp();
 +        disable_seccomp();
@@ -2452,19 +2365,27 @@ index 10d03262..e4208023 100644
  out_abort_creds:
      if (profile)
          ksu_put_root_profile(profile);
-@@ -235,6 +244,7 @@ void escape_to_root_for_init(void)
+@@ -234,7 +243,14 @@ void escape_to_root_for_init(void)
+     }
  
      setup_selinux(KERNEL_SU_CONTEXT, cred);
-     commit_creds(cred);
-+    ksu_samsung_defex_sync_current();
+-    commit_creds(cred);
++    /* Same path as a profile install: on a KDP kernel the credential has to go back through
++     * the reference counter, and a direct commit leaves the hypervisor's copy stale. */
++    if (ksu_kdp_commit_creds(cred)) {
++        pr_err("Failed to install init's creds!\n");
++        abort_creds(cred);
++        return;
++    }
++    ksu_defex_sync_current();
  }
  
  void __init ksu_app_profile_init(void)
 diff --git a/kernel/runtime/ksud_integration.c b/kernel/runtime/ksud_integration.c
-index a1058150..70777d24 100644
+index 7ebe1fc1..1d600e90 100644
 --- a/kernel/runtime/ksud_integration.c
 +++ b/kernel/runtime/ksud_integration.c
-@@ -570,8 +570,14 @@ void ksu_execveat_hook_ksud(const struct pt_regs *regs)
+@@ -598,8 +598,14 @@ void ksu_execveat_hook_ksud(const struct pt_regs *regs)
      ksu_execve_hook_ksud_common(filename_user, argv_user);
  }
  
@@ -2480,7 +2401,7 @@ index a1058150..70777d24 100644
  {
      unsigned int fd = PT_REGS_SYSCALL_PARM1(regs);
      char __user **buf_ptr = (char __user **)&PT_REGS_PARM2(regs);
-@@ -582,7 +588,7 @@ static long ksu_sys_read(const struct pt_regs *regs)
+@@ -610,7 +616,7 @@ static long ksu_sys_read(const struct pt_regs *regs)
  }
  
  static long (*orig_sys_fstat)(const struct pt_regs *regs);
@@ -2490,18 +2411,19 @@ index a1058150..70777d24 100644
      unsigned int fd = PT_REGS_SYSCALL_PARM1(regs);
      void __user *statbuf = (void __user *)PT_REGS_PARM2(regs);
 diff --git a/kernel/selinux/selinux.c b/kernel/selinux/selinux.c
-index 79fcad78..bf6d1d4e 100644
+index 79fcad78..5d45a330 100644
 --- a/kernel/selinux/selinux.c
 +++ b/kernel/selinux/selinux.c
-@@ -5,6 +5,7 @@
+@@ -5,6 +5,8 @@
  #include "linux/version.h"
  #include "klog.h" // IWYU pragma: keep
  #include "ksu.h"
 +#include "compat/samsung_defex.h"
++#include "ksu_samsung_kdp.h"
  
  /*
   * Cached SID values for frequently checked contexts.
-@@ -183,7 +184,19 @@ static bool is_sid_match(const struct cred *cred, u32 cached_sid, const char *fa
+@@ -183,7 +185,19 @@ static bool is_sid_match(const struct cred *cred, u32 cached_sid, const char *fa
          return tsec->sid == cached_sid;
      }
  
@@ -2522,13 +2444,19 @@ index 79fcad78..bf6d1d4e 100644
      struct lsm_context ctx;
      bool result;
      if (__security_secid_to_secctx(tsec->sid, &ctx)) {
-@@ -233,6 +246,9 @@ void escape_to_root_for_adb_root(void)
+@@ -232,7 +246,14 @@ void escape_to_root_for_adb_root(void)
+         abort_creds(cred);
          return;
      }
-     commit_creds(cred);
+-    commit_creds(cred);
++    if (ksu_kdp_commit_creds(cred)) {
++        pr_err("Failed to install adbd's creds!\n");
++        abort_creds(cred);
++        return;
++    }
 +    /* DEFEX keeps its own copy of the credential; without this the task stays at the old uid in
 +     * that copy and the next exec is judged against it. */
-+    ksu_samsung_defex_sync_current();
++    ksu_defex_sync_current();
  }
  
  #ifdef CONFIG_KSU_SUSFS

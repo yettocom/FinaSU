@@ -14,19 +14,18 @@ index e357356a..06066e3b 100644
  
      pub const DAEMON_LINK_PATH: &str = concatcp!(BINARY_DIR, "ksud");
 diff --git a/userspace/ksud/src/late_load.rs b/userspace/ksud/src/late_load.rs
-index ae64fc4f..9b91ec92 100644
+index 5a4dcf6d..1e0aaf14 100644
 --- a/userspace/ksud/src/late_load.rs
 +++ b/userspace/ksud/src/late_load.rs
-@@ -1,7 +1,7 @@
+@@ -1,6 +1,6 @@
  use anyhow::{Context, Result};
  use log::{info, warn};
- use rustix::cstr;
--use std::{process::Command, time::Instant};
-+use std::time::Instant;
+-use std::{ffi::CString, process::Command, time::Instant};
++use std::{ffi::CString, time::Instant};
  
  use crate::module::{ScriptWait, handle_updated_modules, prune_modules};
  use crate::{assets, defs, init_event, magic_mount, mount_guard, restorecon, utils};
-@@ -35,11 +35,23 @@ fn dump_process_info(label: &str) {
+@@ -34,11 +34,23 @@ fn dump_process_info(label: &str) {
      );
  }
  
@@ -52,26 +51,25 @@ index ae64fc4f..9b91ec92 100644
      // 1. Check if KernelSU is already loaded
      if ksuinit::has_kernelsu() {
          info!("KernelSU already loaded, skip loading ko");
-@@ -58,11 +70,15 @@ pub fn run(package_name: &String, kmi: Option<String>, allow_shell: bool) -> Res
- 
-         // 4. Load kernelsu.ko from memory with manual relocation
+@@ -59,7 +71,16 @@ pub fn run(package_name: &String, kmi: Option<String>, allow_shell: bool) -> Res
          info!("Loading kernelsu.ko for KMI {kmi}...");
--        // bundled flag is meaningless in jailbreak mode since we can't flash boot to update it.
+         // bundled flag is meaningless in jailbreak mode since we can't flash boot to update it.
+         let vivo_family = crate::boot_patch::detected_vivo_family();
+-        let params = crate::boot_patch::late_load_module_params(allow_shell, vivo_family);
++        let mut params = crate::boot_patch::late_load_module_params(allow_shell, vivo_family);
 +        // `bundled=1`: the manager turns KSU_GET_INFO_FLAG_BUNDLED (the kernel's ksu_bundled,
 +        // which a late load takes from this module parameter - the image-patch config path is
 +        // skipped when late loaded) into its "custom LKM" badge.  This kit loads its own kernel
 +        // next to the manager, so report it bundled; upstream leaves the flag off because a
 +        // jailbreak load cannot flash boot to update the LKM.
-         let params = if allow_shell {
--            cstr!("allow_shell=1")
-+            cstr!("allow_shell=1 bundled=1")
-         } else {
--            cstr!("")
-+            cstr!("bundled=1")
-         };
-         ksuinit::load_module(&ko_data, params).context("Failed to load kernelsu.ko")?;
-         info!("kernelsu.ko loaded successfully!");
-@@ -79,7 +95,7 @@ pub fn run(package_name: &String, kmi: Option<String>, allow_shell: bool) -> Res
++        if !params.is_empty() {
++            params.push(' ');
++        }
++        params.push_str("bundled=1");
+         if vivo_family == Some(true)
+             && std::fs::read_to_string("/proc/modules").is_ok_and(|modules| {
+                 modules
+@@ -87,7 +108,7 @@ pub fn run(package_name: &String, kmi: Option<String>, allow_shell: bool) -> Res
          warn!("clear temp configs failed: {e}");
      }
  
@@ -80,7 +78,7 @@ index ae64fc4f..9b91ec92 100644
  
      crate::hot_install::clean_trash();
  
-@@ -143,23 +159,16 @@ pub fn run(package_name: &String, kmi: Option<String>, allow_shell: bool) -> Res
+@@ -151,23 +172,16 @@ pub fn run(package_name: &String, kmi: Option<String>, allow_shell: bool) -> Res
      // 13. Execute boot-completed stage scripts (non-blocking)
      init_event::run_stage("boot-completed", ScriptWait::NoWait);
  
