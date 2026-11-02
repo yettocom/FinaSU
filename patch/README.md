@@ -2,19 +2,19 @@
 
 Patches that make [FinaSU](https://github.com/LyraVoid/FinaSU) work on Samsung
 devices whose kernels carry RKP, KDP, DEFEX and SELinux hooks. Based on tag
-**v1.4.2** (`96104eac`, version 33155), upstream `kernel/` untouched by us.
+**v1.4.3** (`2d5786b9`, version 33156), upstream `kernel/` untouched by us.
 
 | Patch | Touches | Size |
 |---|---|---|
-| `FinaSU-v1.4.2-samsung-kdp-rkp-defex.patch` | `kernel/` - 19 files, +1820 -89 | 97,322 B |
-| `FinaSU-v1.4.2-samsung-lateload.patch` | `userspace/ksud/src/` - 3 files, +241 -37 | 17,314 B |
+| `FinaSU-v1.4.3-samsung-kdp-rkp-defex.patch` | `kernel/` - 19 files, +1820 -89 | 97,322 B |
+| `FinaSU-v1.4.3-samsung-lateload.patch` | `userspace/ksud/src/` - 3 files, +241 -37 | 17,314 B |
 
 ## Apply
 
 ```sh
-git clone https://github.com/LyraVoid/FinaSU -b v1.4.2 && cd FinaSU
-patch -p1 --forward --batch < FinaSU-v1.4.2-samsung-kdp-rkp-defex.patch
-patch -p1 --forward --batch < FinaSU-v1.4.2-samsung-lateload.patch
+git clone https://github.com/LyraVoid/FinaSU -b v1.4.3 && cd FinaSU
+patch -p1 --forward --batch < FinaSU-v1.4.3-samsung-kdp-rkp-defex.patch
+patch -p1 --forward --batch < FinaSU-v1.4.3-samsung-lateload.patch
 ```
 
 `git apply` also works on Linux and macOS. On Windows, replace the two `uapi`
@@ -22,9 +22,9 @@ symlinks with real directories first (`kernel/include/uapi`,
 `manager/app/src/main/cpp/uapi`), otherwise the DDK build cannot find
 `uapi/app_profile.h`.
 
-## What changed for v1.4.2
+## What changed for v1.4.3
 
-- Nothing upstream in our surface: v1.4.1 to v1.4.2 is a single commit that
+- Nothing upstream in our surface: v1.4.1 to v1.4.3 is a single commit that
   reverts the FolkZygisk HyperOS runtime compatibility work (27 files under
   `userspace/folkzygisk/`); `kernel/` is untouched. Both patches are
   byte-identical to the v1.4.1 ones.
