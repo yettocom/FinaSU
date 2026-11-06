@@ -130,15 +130,19 @@ pub enum ModuleType {
 }
 
 #[allow(clippy::needless_pass_by_value)]
-pub fn foreach_module(
-    module_type: ModuleType,
-    mut f: impl FnMut(&Path) -> Result<()>,
-) -> Result<()> {
+pub fn foreach_module(module_type: ModuleType, f: impl FnMut(&Path) -> Result<()>) -> Result<()> {
     let modules_dir = Path::new(match module_type {
         ModuleType::Updated => MODULE_UPDATE_DIR,
         _ => defs::MODULE_DIR,
     });
-    let dir = std::fs::read_dir(modules_dir)?;
+    foreach_module_in(&module_type, std::fs::read_dir(modules_dir)?, f)
+}
+
+fn foreach_module_in(
+    module_type: &ModuleType,
+    dir: std::fs::ReadDir,
+    mut f: impl FnMut(&Path) -> Result<()>,
+) -> Result<()> {
     for entry in dir.flatten() {
         let path = entry.path();
         if !path.is_dir() {
@@ -146,11 +150,11 @@ pub fn foreach_module(
             continue;
         }
 
-        if module_type == Active && path.join(defs::DISABLE_FILE_NAME).exists() {
+        if *module_type == Active && path.join(defs::DISABLE_FILE_NAME).exists() {
             info!("{} is disabled, skip", path.display());
             continue;
         }
-        if module_type == Active && path.join(defs::REMOVE_FILE_NAME).exists() {
+        if *module_type == Active && path.join(defs::REMOVE_FILE_NAME).exists() {
             warn!("{} is removed, skip", path.display());
             continue;
         }
@@ -1202,13 +1206,55 @@ pub fn list_modules() -> Result<()> {
     Ok(())
 }
 
-/// Get all managed features from active modules
-/// Modules declare managed features via config system (manage.<feature>=true)
+/// Declarations from `module.prop` and the module config, merged.
+fn declared_managed_features(
+    prop_value: Option<&str>,
+    config: &HashMap<String, String>,
+) -> Vec<String> {
+    let mut declared: Vec<String> = Vec::new();
+
+    if let Some(list) = prop_value {
+        declared.extend(
+            list.split(',')
+                .map(str::trim)
+                .filter(|name| !name.is_empty())
+                .map(ToString::to_string),
+        );
+    }
+
+    declared.extend(config.iter().filter_map(|(key, value)| {
+        if key.starts_with("manage.") && crate::module_config::parse_bool_config(value) {
+            key.strip_prefix("manage.").map(ToString::to_string)
+        } else {
+            None
+        }
+    }));
+
+    declared.sort_unstable();
+    declared.dedup();
+    declared
+}
+
+/// Get all managed features declared by active modules.
 /// Returns: HashMap<ModuleId, Vec<ManagedFeature>>
 pub fn get_managed_features() -> Result<HashMap<String, Vec<String>>> {
-    let mut managed_features_map: HashMap<String, Vec<String>> = HashMap::new();
+    get_managed_features_in(Path::new(defs::MODULE_DIR))
+}
 
-    foreach_active_module(|module_path| {
+fn get_managed_features_in(modules_dir: &Path) -> Result<HashMap<String, Vec<String>>> {
+    let mut managed_features_map: HashMap<String, Vec<String>> = HashMap::new();
+    let dir = match std::fs::read_dir(modules_dir) {
+        Ok(dir) => dir,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            return Ok(managed_features_map);
+        }
+        Err(error) => {
+            return Err(error)
+                .with_context(|| format!("Read module directory {}", modules_dir.display()));
+        }
+    };
+
+    foreach_module_in(&Active, dir, |module_path| {
         // Get module ID
         let Some(module_id) = module_path.file_name().and_then(|n| n.to_str()) else {
             warn!(
@@ -1218,34 +1264,112 @@ pub fn get_managed_features() -> Result<HashMap<String, Vec<String>>> {
             return Ok(());
         };
 
-        // Read module config
+        // Read module.prop first: a broken config must not hide its declaration.
+        let prop_value = read_module_prop(module_path)
+            .ok()
+            .and_then(|prop| prop.get("managedFeatures").cloned());
+
         let config = match crate::module_config::merge_configs(module_id) {
             Ok(c) => c,
             Err(e) => {
                 warn!("Failed to merge configs for module '{module_id}': {e}");
-                return Ok(()); // Skip this module
+                HashMap::new()
             }
         };
 
-        // Extract manage.* config entries
-        let mut feature_list = Vec::new();
-        for (key, value) in &config {
-            if key.starts_with("manage.") {
-                // Parse feature name
-                if let Some(feature_name) = key.strip_prefix("manage.")
-                    && crate::module_config::parse_bool_config(value)
-                {
-                    feature_list.push(feature_name.to_string());
-                }
-            }
-        }
-
-        if !feature_list.is_empty() {
-            managed_features_map.insert(module_id.to_string(), feature_list);
+        let declared = declared_managed_features(prop_value.as_deref(), &config);
+        if !declared.is_empty() {
+            managed_features_map.insert(module_id.to_string(), declared);
         }
 
         Ok(())
     })?;
 
     Ok(managed_features_map)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{declared_managed_features, get_managed_features_in};
+    use std::collections::HashMap;
+
+    fn config(entries: &[(&str, &str)]) -> HashMap<String, String> {
+        entries
+            .iter()
+            .map(|(key, value)| ((*key).to_owned(), (*value).to_owned()))
+            .collect()
+    }
+
+    #[test]
+    fn managed_features_allow_missing_directory_but_not_other_errors() {
+        let temp = tempfile::tempdir().unwrap();
+        assert!(
+            get_managed_features_in(&temp.path().join("missing"))
+                .unwrap()
+                .is_empty()
+        );
+
+        let not_a_directory = temp.path().join("file");
+        std::fs::write(&not_a_directory, "").unwrap();
+        assert!(get_managed_features_in(&not_a_directory).is_err());
+    }
+
+    #[test]
+    fn managed_features_still_find_active_module_declarations() {
+        let temp = tempfile::tempdir().unwrap();
+        let module = temp.path().join("test_module");
+        std::fs::create_dir(&module).unwrap();
+        std::fs::write(module.join("module.prop"), "managedFeatures=selinux_hide\n").unwrap();
+        assert_eq!(
+            get_managed_features_in(temp.path()).unwrap()["test_module"],
+            vec!["selinux_hide"]
+        );
+        std::fs::write(module.join("disable"), "").unwrap();
+        assert!(get_managed_features_in(temp.path()).unwrap().is_empty());
+    }
+
+    #[test]
+    fn prop_declaration_alone_marks_the_feature() {
+        assert_eq!(
+            declared_managed_features(Some("kernel_umount"), &config(&[])),
+            vec!["kernel_umount".to_owned()]
+        );
+    }
+
+    #[test]
+    fn config_declaration_alone_marks_the_feature() {
+        assert_eq!(
+            declared_managed_features(None, &config(&[("manage.kernel_umount", "true")])),
+            vec!["kernel_umount".to_owned()]
+        );
+    }
+
+    #[test]
+    fn both_sources_merge_without_duplicates() {
+        assert_eq!(
+            declared_managed_features(
+                Some(" kernel_umount , su_compat ,, "),
+                &config(&[("manage.kernel_umount", "true"), ("manage.sulog", "1")])
+            ),
+            vec![
+                "kernel_umount".to_owned(),
+                "su_compat".to_owned(),
+                "sulog".to_owned()
+            ]
+        );
+    }
+
+    #[test]
+    fn false_or_unrelated_config_entries_do_not_declare() {
+        assert_eq!(
+            declared_managed_features(
+                None,
+                &config(&[
+                    ("manage.kernel_umount", "false"),
+                    ("override.description", "x"),
+                ])
+            ),
+            Vec::<String>::new()
+        );
+    }
 }
