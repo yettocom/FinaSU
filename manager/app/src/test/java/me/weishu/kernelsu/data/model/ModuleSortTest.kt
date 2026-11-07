@@ -35,8 +35,9 @@ class ModuleSortTest {
         enabledFirst: Boolean = false,
         nameOrder: ModuleNameOrder = ModuleNameOrder.Default,
         manualOrder: List<String> = emptyList(),
+        editing: Boolean = false,
     ): List<String> = modules
-        .sortedWith(moduleSortComparator(collator, priorities, enabledFirst, nameOrder, manualOrder))
+        .sortedWith(moduleSortComparator(collator, priorities, enabledFirst, nameOrder, manualOrder, editing))
         .map { it.id }
 
     @Test
@@ -47,8 +48,16 @@ class ModuleSortTest {
             facts("zygisk_meta", name = "LSPosed Meta", meta = true, webUi = true).sortGroup(),
         )
         assertEquals(
+            ModuleSortGroup.LSPosed,
+            facts("zygisk_xposed_fork", name = "Sample hooker", webUi = true).sortGroup(),
+        )
+        assertEquals(
+            ModuleSortGroup.LSPosed,
+            facts("zygisk_vector", name = "Vector", webUi = true).sortGroup(),
+        )
+        assertEquals(
             ModuleSortGroup.Zygisk,
-            facts("zygisknext", name = "LSPosed helper", webUi = true).sortGroup(),
+            facts("zygisknext", name = "Zygisk Next", webUi = true).sortGroup(),
         )
         assertEquals(
             ModuleSortGroup.LSPosed,
@@ -60,10 +69,22 @@ class ModuleSortTest {
     }
 
     @Test
+    fun `an xposed module is recognised by its id or its name`() {
+        assertTrue(isLSPosedModule("zygisk_xposed_fork", "Sample hooker"))
+        assertTrue(isLSPosedModule("zygisk_xposed_fork", "任意名字"))
+        assertTrue(isLSPosedModule("com.example.xposedplugin", "whatever"))
+        assertTrue(isLSPosedModule("some_module", "Hooked through LSPosed"))
+        assertTrue(isLSPosedModule("zygisk_vector", "Vector"))
+        assertTrue(isLSPosedModule("zygisk_vector", "Vector fork"))
+        assertFalse(isLSPosedModule("zygisknext", "Zygisk Next"))
+        assertFalse(isLSPosedModule("webui_module", "Web UI"))
+    }
+
+    @Test
     fun `the zygisk runtime provider leads the modules that hook through it`() {
         val modules = listOf(
-            facts("zygisk_lsposed", name = "LSPosed IT"),
-            facts("zygisk-module-xfingerprint-pay-wechat", name = "Zygisk - 指纹支付 - 微信"),
+            facts("zygisk-module-a", name = "Zygisk module A"),
+            facts("zygisk-module-b", name = "Zygisk module B"),
             facts("zygisksu", name = "Zygisk Next"),
             facts("rezygisk"),
         )
@@ -71,7 +92,7 @@ class ModuleSortTest {
         // The two providers are the only modules carrying the runtime, and both read before the
         // modules that merely mention Zygisk in their id.
         assertEquals(
-            listOf("rezygisk", "zygisksu", "zygisk_lsposed", "zygisk-module-xfingerprint-pay-wechat"),
+            listOf("rezygisk", "zygisksu", "zygisk-module-a", "zygisk-module-b"),
             sorted(modules),
         )
     }
@@ -86,8 +107,8 @@ class ModuleSortTest {
         assertTrue(isZygiskProvider("onyxzygisk"))
         assertTrue(isZygiskProvider("yukizygisk"))
         assertTrue(isZygiskProvider("brezygisk"))
-        assertFalse(isZygiskProvider("zygisk_lsposed"))
-        assertFalse(isZygiskProvider("zygisk-module-xfingerprint-pay-wechat"))
+        assertFalse(isZygiskProvider("zygisk_xposed_fork"))
+        assertFalse(isZygiskProvider("zygisk-module-a"))
     }
 
     @Test
@@ -103,6 +124,36 @@ class ModuleSortTest {
 
         assertEquals(
             listOf("zzz_meta", "mmm_zygisk", "zzz_lsposed", "mmm_web", "zzz_action", "aaa_plain"),
+            sorted(modules),
+        )
+    }
+
+    @Test
+    fun `ticking the lsposed group lifts the modules that hook through it`() {
+        val modules = listOf(
+            facts("aaa_plain"),
+            facts("zygisk_xposed_fork", name = "Sample hooker"),
+            facts("zygisksu", name = "Zygisk Next"),
+        )
+
+        assertEquals(
+            listOf("zygisk_xposed_fork", "aaa_plain", "zygisksu"),
+            sorted(modules, setOf(ModuleSortGroup.LSPosed)),
+        )
+    }
+
+    @Test
+    fun `a list reads zygisk runtime, then lsposed, then the rest`() {
+        val modules = listOf(
+            facts("aaa_plain_module", name = "Plain module"),
+            facts("mmm_plain_module", name = "Another plain module"),
+            facts("zygisk_xposed_fork", name = "Sample hooker"),
+            facts("zygisksu", name = "Zygisk Next"),
+            facts("rezygisk"),
+        )
+
+        assertEquals(
+            listOf("rezygisk", "zygisksu", "zygisk_xposed_fork", "aaa_plain_module", "mmm_plain_module"),
             sorted(modules),
         )
     }
@@ -171,24 +222,41 @@ class ModuleSortTest {
     }
 
     @Test
-    fun `a ticked kind still outranks the manual order`() {
+    fun `manual order overrides group provider and enabled priorities`() {
         val modules = listOf(
-            facts("zzz_meta", meta = true),
+            facts("zzz_meta", meta = true, enabled = true),
             facts("aaa_web", webUi = true),
+            facts("zygisksu"),
+            facts("zygisk_user", enabled = false),
         )
 
         assertEquals(
-            listOf("zzz_meta", "aaa_web"),
+            listOf("zygisk_user", "aaa_web", "zygisksu", "zzz_meta"),
             sorted(
                 modules,
-                priorities = setOf(ModuleSortGroup.MetaModule),
-                manualOrder = listOf("aaa_web", "zzz_meta"),
+                enabledFirst = true,
+                manualOrder = listOf("zygisk_user", "aaa_web", "zygisksu", "zzz_meta"),
+                editing = true,
             ),
         )
     }
 
     @Test
-    fun `modules the manual order does not mention follow the name order`() {
+    fun `display rules apply without changing the manual order`() {
+        val modules = listOf(
+            facts("web", name = "Zeta", webUi = true),
+            facts("plain", name = "Alpha"),
+            facts("other", name = "Beta"),
+        )
+        val manual = listOf("plain", "other", "web")
+        assertEquals(listOf("plain", "other", "web"), sorted(modules, manualOrder = manual, editing = true))
+        assertEquals(listOf("web", "plain", "other"), sorted(modules, manualOrder = manual))
+        assertEquals(listOf("web", "other", "plain"), sorted(modules, manualOrder = manual, nameOrder = ModuleNameOrder.Descending))
+        assertEquals(listOf("plain", "other", "web"), sorted(modules, priorities = emptySet(), manualOrder = manual))
+    }
+
+    @Test
+    fun `name order overrides manual order for display`() {
         val modules = listOf(
             facts("aaa_plain", name = "Zeta"),
             facts("bbb_plain", name = "Alpha"),
@@ -196,7 +264,7 @@ class ModuleSortTest {
         )
 
         assertEquals(
-            listOf("ccc_plain", "bbb_plain", "aaa_plain"),
+            listOf("bbb_plain", "ccc_plain", "aaa_plain"),
             sorted(
                 modules,
                 priorities = emptySet(),
