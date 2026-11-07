@@ -1538,7 +1538,7 @@ index a3bdb0bc..07c51480 100644
  
  static int ni_uninstall_hooks_locked(void);
 diff --git a/kernel/feature/selinux_hide.c b/kernel/feature/selinux_hide.c
-index 761c5ea0..1d39c4d7 100644
+index 01e76c31..c736c77e 100644
 --- a/kernel/feature/selinux_hide.c
 +++ b/kernel/feature/selinux_hide.c
 @@ -31,6 +31,7 @@
